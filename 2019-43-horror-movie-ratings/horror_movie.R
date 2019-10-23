@@ -93,8 +93,8 @@ horror_movie %>%
         axis.text =  element_text(size = 10, family = "Exquisite Corpse", color = "orange"),
         legend.text =  element_text(size = 10, family = "Exquisite Corpse", color = "red"),
         legend.title =  element_text(size = 10, family = "Exquisite Corpse", color = "red"))+
-  labs(x = "Rating",
-       y = "Genre combination",
+  labs(x = "Genre combination",
+       y = "Rating",
        title = "Review Rating by genre combination",
        subtitle = "First 20 genre combination")
 
