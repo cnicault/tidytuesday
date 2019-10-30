@@ -90,6 +90,7 @@ nyc_squirrels %>%
   annotate("text", x = 1.5, y = 0.5, size = 3, color = "black", label = result_pvalue, fontface = "bold")+
   annotate("text", x = 1.5, y = 0.45, size = 3, color = "black", label = result_df, fontface = "bold")+
   annotate("text", x = 1.5, y = 0.4, size = 3, color = "black", label = "The test shows a significant association between shift and activity", fontface = "bold")+
+  theme(axis.title.y = element_blank())+
   labs(title = "Squirrel activity by shift",
        subtitle = "Squirrels are more seen climbing in the morning and eating in the afternoon",
        x = "Shift",
