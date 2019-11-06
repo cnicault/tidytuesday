@@ -23,7 +23,7 @@ Visualisation of the number of movies per countries, the average ratings by rele
 
 ----
 
-## 2019 week 44 - 	NYC Squirrel Census
+## 2019 week 44 - NYC Squirrel Census
 
 Visualisation of the location of squirrels in Central Park, combination of colors, activity by shift and by age.
 
@@ -34,4 +34,15 @@ Visualisation of the location of squirrels in Central Park, combination of color
 ![Squirrels activity by shift](/2019-44-NYC-squirrel-census/activity_by_shift.png)
 
 ![Squirrels activity by age](/2019-44-NYC-squirrel-census/activity_by_age.png)
+
+----
+
+## 2019 week 45 - Bike & Walk Commutes
+
+Visualisation of the proportion of commuting by bike or walk in US
+
+![Map of the walking to work proportion](/2019-45-bike-walk-commutes/map_commute_city.png)
+
+![30 first cities for  walking or cycling to work](/2019-45-bike-walk-commutes/30_first_cities.png)
+
 
