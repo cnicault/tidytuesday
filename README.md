@@ -6,7 +6,7 @@
 
 When do people vote for the bird of the year in New Zealand? Apparently during office hours!
 
-![Days and time of the vote](/\2019-47-NZ-bird-of-year/votes_per_days_and_hours.png)
+![Days and time of the vote](/2019-47-NZ-bird-of-year/votes_per_days_and_hours.png)
 
 ----
 
