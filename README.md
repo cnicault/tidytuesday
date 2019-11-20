@@ -2,6 +2,14 @@
 
 ----
 
+## 2019 week 47 - NZ Bird of the Year
+
+When do people vote for the bird of the year in New Zealand? Apparently during office hours!
+
+![Days and time of the vote](/\2019-47-NZ-bird-of-year/votes_per_days_and_hours.png)
+
+----
+
 ## 2019 week 46 - Cran code
 
 Visualisation of the languages and packages combination. Interactive treemap and circular treemap.
