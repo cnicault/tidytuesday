@@ -2,6 +2,14 @@
 
 ----
 
+## 2019 week 48 - Student Loan Debt
+
+Looking at the evolution of the student debt
+
+![evolution of the student debt](/2019-48-2019-48-student-loan-debt/evolution_student_debt.png)
+
+----
+
 ## 2019 week 47 - NZ Bird of the Year
 
 When do people vote for the bird of the year in New Zealand? Apparently during office hours!

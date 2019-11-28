@@ -7,6 +7,7 @@ library(ggthemr)
 library(scales)
 library(patchwork)
 
+
 cran_code <- readr::read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2019/2019-11-12/loc_cran_packages.csv")
 
 
@@ -24,6 +25,7 @@ tidyverse_pkg <- cran_code %>%
   mutate(label = paste0(type_line, " : ", total))
 
 library(data.tree)
+library(circlepackeR)
 tidyverse_pkg$pathString <- paste("Languages", tidyverse_pkg$pkg_name, tidyverse_pkg$language, tidyverse_pkg$label, sep = "/")
 tidy_levels <- as.Node(tidyverse_pkg)
 
