@@ -6,7 +6,7 @@
 
 Looking at the evolution of the student debt
 
-![evolution of the student debt](/2019-48-2019-48-student-loan-debt/evolution_student_debt.png)
+![evolution of the student debt](/2019-48-student-loan-debt/evolution_student_debt.png)
 
 ----
 
