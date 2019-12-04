@@ -1,5 +1,20 @@
 # Tidy Tuesday data visualisation
 
+
+----
+
+## 2019 week 49 - Philly Parking Tickets
+
+Studying the amount of fines in Philadelphia in 2017, and comparing the agencies
+
+![Agency presence by zip code](/2019-49-Philly-parking-tickets/agency_presence.png)
+
+![Comparing agencies with PPA](/2019-49-Philly-parking-tickets/comparing_agencies.png)
+
+![Fine distribution by day and hour](/2019-49-Philly-parking-tickets/fine_value_distr.png)
+
+![Amount of fine for the 30 first violation description](/2019-49-Philly-parking-tickets/amount_30_violation.png)
+
 ----
 
 ## 2019 week 48 - Student Loan Debt
