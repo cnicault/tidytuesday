@@ -117,7 +117,7 @@ p4 <- loans %>%
 
 patchwork <- ((p1 / p2) | p3) / p4
 
-patchwork + plot_annotation(title = "Evolution of students capacity to repay loan",
+patchwork + plot_annotation(title = "Evolution of students' capacity to repay loan",
                             subtitle = "The amount of loans increased by 40% in 2018, where the amount of payment is stable around $ 2 billions\n Therefore, the percentage of loan being repaid decreases and drop from 3.1% to 1.6%",
                             caption = "Visualisation: Christophe Nicault | Data: Department of Education / Dignity and Debt",
                             theme = theme(plot.background = element_rect(fill = "#f1f1f1")))+
