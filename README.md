@@ -3,6 +3,18 @@
 
 ----
 
+## 2019 week 50 - 	Replicating plots in R
+
+Instead of replicating a plot, I used the dataset from dslabs to study the impact of carbon emission on co2 concentration and temperature anomalies
+
+![Impact of carbon emission on co2 concentration](/2019-50-Replicating-plots/impact_carbon_emissions.png)
+
+![Temperature anomalies](/2019-50-Replicating-plots/temp_anomalies.png)
+
+![Co2 concentration over time](/2019-50-Replicating-plots/co2_concentration.png)
+
+----
+
 ## 2019 week 49 - Philly Parking Tickets
 
 Studying the amount of fines in Philadelphia in 2017, and comparing the agencies
