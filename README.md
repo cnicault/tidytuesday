@@ -1,9 +1,17 @@
 # Tidy Tuesday data visualisation
 
+----
+
+## 2019 week 51 - Adoptable dogs
+
+Looking into where the dogs adoptable in the USA came from when originated outside USA.
+
+![Origin of adoptable dogs coming to the USA](/2019-51-adoptable-dogs/origin_of_dogs.png)
+
 
 ----
 
-## 2019 week 50 - 	Replicating plots in R
+## 2019 week 50 - Replicating plots in R
 
 Instead of replicating a plot, I used the dataset from dslabs to study the impact of carbon emission on co2 concentration and temperature anomalies
 
