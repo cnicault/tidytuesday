@@ -2,6 +2,17 @@
 
 ----
 
+## 2020 week 03 - Passwords (weaks)
+
+Password strength and time to crack for weak passwords
+
+![Password strength depending of number of character and digits](/2020-03-passwords/password_strength.png)
+
+![Time to crack by category and plotting the strength](/2020-03-passwords/crack_strength.png)
+
+
+----
+
 ## 2019 week 51 - Adoptable dogs
 
 Looking into where the dogs adoptable in the USA came from when originated outside USA.
