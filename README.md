@@ -1,5 +1,14 @@
 # Tidy Tuesday data visualisation
 
+
+----
+
+## 2020 week 04 - Spotify songs
+
+Visualisation of the result of PCA to look specifically in the features that influence the most the popularity
+
+![Audio features that influence the the most the popularity](/2020-04-song-genres/song_popularity_pca.png)
+
 ----
 
 ## 2020 week 03 - Passwords (weaks)
