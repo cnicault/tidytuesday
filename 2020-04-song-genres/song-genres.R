@@ -1,6 +1,6 @@
 # title: "Tidy Tuesday - 	Song Genres"
 # author: "Christophe Nicault"
-# date: "23 january 2020"
+# date: "25 january 2020"
 
 library(tidyverse)
 library(FactoMineR)
@@ -18,7 +18,7 @@ spotify_songs <- spotify_songs %>%
   mutate(pop = case_when(track_popularity >=75 ~ 8,
                          track_popularity <=25 ~ 2,
                          track_popularity < 75 & track_popularity > 25  ~ 5))
-
+sps <- scale(sps)
 pca <- PCA(sps)
 
 variables<-data.frame(var = rownames(pca$var$coord),x = pca$var$coord[,1],y = pca$var$coord[,2], z = pca$var$coord[,3])
@@ -26,7 +26,7 @@ variables$x <- variables$x * 200
 variables$y <- variables$y * 200
 variables$z <- variables$z * 200
 
-individu<-data.frame(x=scale(pca$ind$coord[,1]), y=scale(pca$ind$coord[,2]), z=scale(pca$ind$coord[,3]),color=sps$track_popularity)
+individu<-data.frame(x=pca$ind$coord[,1], y=pca$ind$coord[,2], z=pca$ind$coord[,3],color=spotify_songs$track_popularity)
 individu$pop <- spotify_songs$pop
 individu$x <- individu$x * 80
 individu$y <- individu$y * 80
