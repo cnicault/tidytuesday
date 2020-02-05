@@ -2,6 +2,15 @@
 
 ----
 
+## 2020 week 06 - NFL Stadium Attendance
+
+Looking at the differences between the winner of the Superbowl and the other teams
+
+![NFL team comparison](/2020-06-NFL-stadium-attendance/NFL_team_perf.png)
+
+
+----
+
 ## 2020 week 05 - San Francisco Trees
 
 Visualisation of the evolution of the tree plantation in San Francisco
