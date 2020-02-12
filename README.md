@@ -6,7 +6,7 @@
 
 Occupancy & cancellation study from a hotel's bookings
 
-![Occupancy & cancellation](/2020-07-Hotel Bookings/hotel_bookings.png)
+![Occupancy & cancellation](/2020-07-Hotel-Bookings/hotel_bookings.png)
 
 
 ----
