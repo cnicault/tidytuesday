@@ -2,6 +2,15 @@
 
 ----
 
+## 2020 week 07 - Hotel Bookings
+
+Occupancy & cancellation study from a hotel's bookings
+
+![Occupancy & cancellation](/2020-07-Hotel Bookings/hotel_bookings.png)
+
+
+----
+
 ## 2020 week 06 - NFL Stadium Attendance
 
 Looking at the differences between the winner of the Superbowl and the other teams
