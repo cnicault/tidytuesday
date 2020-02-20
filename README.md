@@ -2,6 +2,14 @@
 
 ----
 
+## 2020 week 08 - Food's Carbon Footprint
+
+Looking at the consumption of animal and non animal product and their carbon footprint
+
+![food consumption & carbon footprint](/2020-08-food-carbon-footprint/food-consumption.png)
+
+----
+
 ## 2020 week 07 - Hotel Bookings
 
 Occupancy & cancellation study from a hotel's bookings
