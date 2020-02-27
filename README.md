@@ -2,6 +2,14 @@
 
 ----
 
+## 2020 week 09 - Measles Vaccination
+
+MMR vaccination & overall vaccination in US schools
+
+![mmr vaccination](/2020-09-measles-vaccination/mmr_overall_rate.png)
+
+----
+
 ## 2020 week 08 - Food's Carbon Footprint
 
 Looking at the consumption of animal and non animal product and their carbon footprint
