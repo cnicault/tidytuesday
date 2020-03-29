@@ -2,6 +2,14 @@
 
 ----
 
+## 2020 week 13 - Traumatic Brain Injury
+
+Main causes and their group age repartition in the increase of emergency visits<br> for traumatic brain injuries
+
+![traumatic brain injury](/2020-13-traumatic-brain-injury/emergency_visit_brain_injury.png)
+
+----
+
 ## 2020 week 09 - Measles Vaccination
 
 MMR vaccination & overall vaccination in US schools
