@@ -1,5 +1,12 @@
 # Tidy Tuesday data visualisation
 
+----
+
+## 2020 week 46 - Historical phones
+
+Phone inequality between 30 countries with highest GDP and 30 countries with lowest GDP
+
+![Phone inequality in the world](/2020-46-historical-phones/historical_phones_no_na.png)
 
 ----
 
