@@ -2,6 +2,14 @@
 
 ----
 
+## 2020 week 48 - Washington Trails
+
+Features to expect during a hike in Washington state
+
+![Trails features in Washington state](/2020-48-washington-trails/hikes_mixed.png)
+
+----
+
 ## 2020 week 46 - Historical phones
 
 Phone inequality between 30 countries with highest GDP and 30 countries with lowest GDP
