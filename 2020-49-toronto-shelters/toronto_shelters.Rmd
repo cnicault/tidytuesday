@@ -1,0 +1,195 @@
+---
+title: "Toronto Shelters"
+author: "Christophe Nicault"
+date: "07/12/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r load_packages}
+
+library(tidyverse)
+library(plotly)
+library(lubridate)
+library(patchwork)
+library(ragg)
+library(showtext)
+library(ggtext)
+
+font_add_google("Roboto", "roboto")
+font_add_google("Oswald", "oswald")
+font_add_google("Fira Sans", "fira")
+
+showtext_opts(dpi = 96)
+showtext_auto(enable = TRUE)
+```
+
+```{r load_data}
+shelters <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-12-01/shelters.csv')
+```
+
+
+
+```{r data_prep}
+
+coef <- shelters %>%
+  mutate(year = year(occupancy_date)) %>%
+  group_by(sector, year) %>%
+  summarise(avg_cap = mean(capacity, na.rm = TRUE),
+            avg_occ = mean(occupancy, na.rm = TRUE),
+            perc = avg_occ / avg_cap) %>%
+  filter(sector == "Families") %>%
+  mutate(date = ymd(paste(year, "07", "01")),
+         coef_cap = round(avg_cap / lag(avg_cap), 1),
+         coef_occ = round(avg_occ / lag(avg_occ), 1))
+
+peak <- shelters %>%
+  group_by(occupancy_date, sector) %>%
+  summarise(avg_cap = mean(capacity, na.rm = TRUE),
+            avg_occ = mean(occupancy, na.rm = TRUE),
+            coef = avg_occ / avg_cap) %>%
+  mutate(date = ymd(occupancy_date)) %>%
+  filter(coef > 0.95) %>%
+  select(date, sector, coef)
+
+peak_families <- peak %>%
+  filter(sector == "Families")
+
+peak_women <- peak %>%
+  filter(sector == "Women")
+
+years <- tibble(x = seq(ymd("2017-07-01"),ymd("2019-7-01"), by = "year"),
+                y = rep(25,3),
+                label = c("2017","2018","2019"),
+                color = c("light","dark","light"))
+
+text_color<- "#203830"
+
+```
+
+
+```{r main_plot}
+
+families <- shelters %>%
+  mutate(month = month(occupancy_date),
+         year = year(occupancy_date),
+         ym = floor_date(ymd(occupancy_date), "month")) %>% 
+  group_by(sector, ym) %>%
+  summarise(avg_cap = mean(capacity, na.rm = TRUE),
+            avg_occ = mean(occupancy, na.rm = TRUE),
+            perc = avg_occ / avg_cap) %>%
+  filter(sector == "Families") %>%
+  pivot_longer(cols = c(avg_cap, avg_occ), names_to = "type", values_to = "value") %>%
+  ggplot(aes(ym, value, color = type)) +
+  # background rectangle for each year
+  geom_rect(aes(xmin = ymd("2017-01-01"), xmax = ymd("2017-12-31"), ymin = 10, ymax = 250),fill = "#687872", inherit.aes = FALSE) +
+  geom_rect(aes(xmin = ymd("2019-01-01"), xmax = ymd("2019-12-31"), ymin = 10, ymax = 250),fill = "#687872", inherit.aes = FALSE) +
+  geom_text(data = years, aes(x,y, label = label, color = color), size = 24, family = "oswald")+
+  # line from data
+  geom_line(size = 2) +
+  # display yearly average
+  geom_text(data = coef, aes(date, avg_occ - 20, label = round(avg_occ,0)), family = "fira", color = "#002794", size = 20,inherit.aes = FALSE) +
+  # curve with arrows and coef
+  geom_curve(aes(x=ymd("2017-07-01")+30, y = 74, xend = ymd("2018-07-01"), yend = 150), arrow = arrow(ends = "both", type = "closed", length = unit(0.05, "inches")), size = 1, color = "#002794", curvature = 0.2) +
+    geom_curve(aes(x=ymd("2018-07-01")+35, y = 159, xend = ymd("2019-07-01")-35, yend = 170), arrow = arrow(ends = "both", type = "closed", length = unit(0.05, "inches")), size = 1, color = "#002794", curvature = 0.1) +
+  geom_text(aes(x=ymd("2018-03-01"), y = 95), label = "x 2", size = 20, family = "fira") +
+  geom_text(aes(x=ymd("2018-12-31"), y = 150), label = "x 1.1", size = 20, family = "fira") +
+  # Scales
+  scale_x_date(limits = c(ymd("2017-01-01"), ymd("2019-12-31")),breaks = seq(ymd("2017-07-01"),ymd("2020-7-01"), by = "year"), labels = year(seq(ymd("2017-07-01"),ymd("2020-7-01"), by = "year"))) +
+  scale_y_continuous(limits = c(-50,250)) +
+  scale_color_manual(values = c("dark" =  "#5B6964", "light" = "#8EA39C", "avg_cap" = "#E0A81F", "avg_occ"="#002794"))+
+  theme_void() +
+  guides(color = FALSE) +
+  labs(title = "Evolution of shelters capacity and occupancy for families between 2017 to 2019",
+       subtitle = "The daily average <span style='color:#002794;'>**occupancy**</span> has doubled between 2017 and 2018 for famillies, and the                    daily average <span style='color:#E0A81F;'>**capacity**</span><br> adjusted to follow a similar pattern. The situation was                     particularly difficult for the second half of 2017 to the first<br> half of 2018, with many days with a high occupancy rate,                    and some days with an occupancy above the capacity.") +
+  theme(plot.background = element_rect(fill = "#768781", color = NA),
+        panel.background = element_rect(fill = "#768781", color = NA),
+        panel.grid = element_blank(),
+        panel.border = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_blank(),
+        plot.title = element_textbox(family="oswald", size = 64, hjust = 0.5, margin = margin(30,0,0,0), color = text_color),
+        plot.subtitle = element_textbox(family = "roboto",size = 42,lineheight = 0.4, margin = margin(30,0,10,0), color = text_color)
+        )
+
+```
+
+```{r occupancy_rate_families}
+
+family_peak <- peak_families %>%
+  ggplot() +
+  geom_segment(aes(x = date, xend =date, y = 0, yend = -20, color = coef), size = 0.25) +
+  scale_x_date(limits = c(ymd("2017-01-01"), ymd("2019-12-31")),breaks = seq(ymd("2017-07-01"),ymd("2020-7-01"), by = "year"), labels = year(seq(ymd("2017-07-01"),ymd("2020-7-01"), by = "year"))) +
+  scale_color_viridis_c(values = scales::rescale(c(0.95,1.02)), breaks = c(seq(0.95,1.02,0.01)), option = "A") +
+  theme_void() +
+  labs(color = "Occupancy rate") +
+  theme(legend.position = "bottom",
+        legend.text = element_text(size = 32, color = "#BAD6CD", angle = 45),
+        legend.key.height = unit(1,"line"),
+        legend.key.width = unit(3, "line"),
+        legend.title = element_text(size = 42, color = "#BAD6CD"),
+        legend.spacing.y = unit(1,"line"),
+        legend.margin = margin(5,0,0,0)
+        )
+
+```
+
+
+```{r occupancy_rate_women}
+
+women <- peak_women %>%
+  ggplot() +
+  geom_segment(aes(x = date, xend =date, y = 0, yend = -20, color = coef), size = 0.25) +
+  scale_x_date(limits = c(ymd("2017-01-01"), ymd("2019-12-31")),breaks = seq(ymd("2017-07-01"),ymd("2020-7-01"), by = "year"), labels = year(seq(ymd("2017-07-01"),ymd("2020-7-01"), by = "year"))) +
+  scale_color_viridis_c(values = scales::rescale(c(0.95,1.02)), option = "A") +
+  guides(color = FALSE) +
+  labs(title = "Comparison with the occupancy rate of shelters for women",
+         subtitle = "In comparison, for women, the occupancy hasn't evolved in the same proportion, but the situation is tighter<br> with more                      days with a high occupancy rate (above 95 %) over the year, and the rate moved closer to 100% <br>in 2019.") +
+  theme(plot.background = element_rect(fill = "#768781", color = NA),
+        panel.background = element_rect(fill = "#768781"),
+        panel.grid = element_blank(),
+        panel.border = element_blank(),
+        axis.title = element_blank(),
+        axis.ticks = element_blank(),
+        axis.text = element_blank(),
+        plot.title = element_textbox(family="oswald", size = 64, hjust = 0.5, margin = margin(10,0,0,0), color = text_color),
+        plot.subtitle = element_textbox(family = "roboto",size = 42,lineheight = 0.4, margin = margin(20,0,20,0), color = text_color)
+        )
+
+```
+
+
+```{r assemble}
+
+final <- (families  +
+  inset_element(family_peak, left = 0, bottom = 0, top = 0.23, right = 1, clip = FALSE) )/ women +
+  plot_layout(widths = c(1, 1, 1), heights = c(5, 0.5)) +
+  plot_annotation(caption = "Visualisation: Christophe Nicault | Data: package opendatatoronto & open.toronto.ca",
+  theme = theme(plot.background = element_rect(fill = "#768781", color = NA),
+                panel.background = element_rect(fill = "#768781"),
+                plot.caption = element_text(family = "roboto", size = 36, color = text_color))
+  )
+
+```
+
+```{r save}
+
+ggsave(here::here("render", paste0("hikes-", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")),
+       plot = final, device = agg_png(width = 10, height = 11.1, units = "in", res = 300))
+
+dev.off()
+
+```
+
+
+
+
+
+
+
+
