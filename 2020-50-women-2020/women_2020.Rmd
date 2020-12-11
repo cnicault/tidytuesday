@@ -1,0 +1,117 @@
+---
+title: "Women of 2020"
+author: "Christophe Nicault"
+date: "11/12/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load_packages}
+
+library(tidyverse)
+library(ggimage)
+library(ragg)
+library(showtext)
+library(ggforce)
+
+font_add_google("Roboto", "roboto")
+font_add_google("Oswald", "oswald")
+font_add_google("Manrope", "manrope")
+font_add_google("Yesteryear", "yesteryear")
+
+showtext_opts(dpi = 300)
+showtext_auto(enable = TRUE)
+
+```
+
+```{r load_data}
+
+women <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-12-08/women.csv')
+
+```
+
+```{r data_prep}
+# parameters for ellipse equation
+
+a <- 1.4
+b <- 0.4
+
+# get y value of ellipse from x
+y_ellipse <- function(x){
+  return(b*sqrt((1-(x^2/a^2))))
+}
+
+# create the tibble for the polygon
+mask <- tibble(x = c(-a,-a, 0, a, a,  c(seq(9*a/10, -9*a/10, -a/10)), -a),
+               y = c(0,b,b+0.01,b, 0, sapply(c(seq(9*a/10, -9*a/10, -a/10)), y_ellipse), 0))
+
+# Create the tibble with a polygon up and a polygon down for each women
+circle <- women %>%
+  filter(category != "All") %>%
+  mutate(position = as.numeric(as.factor(category))*25) %>%
+  group_by(category) %>%
+  mutate(index = seq(-1, -n(), -1)) %>%
+  mutate(data = list(mask)) %>%
+  unnest(cols = data) %>%
+  mutate(x = position - 2 + x,
+         yup = index + y,
+         ydown = index - y)
+
+# Categories to display on top
+categories <- circle %>%
+  distinct_at(vars(category, position))
+
+```
+
+```{r final_plot}
+
+bck_color <- "#FFFAED"
+
+final <- women %>%
+  filter(category != "All") %>%
+  mutate(position = as.numeric(as.factor(category))*25) %>%
+  group_by(category) %>%
+  mutate(index = seq(-1, -n(), -1)) %>%
+  ggplot(aes())+
+  # category text
+    geom_text(aes(x = position, y = index, label = name, color = category), hjust = 0, size = 6, family = "manrope", fontface = "bold") +
+  # portraits
+    geom_image(aes(x = position - 2, y = index, image = img), size = 0.0260, by = "width", asp = 24/28) +
+  # mask to hide the corners
+    geom_rect(aes(xmin = position - 2 -a, xmax = position -2 + a, ymin = index - b, ymax = index + b), size = 1.5, color = bck_color, fill = NA) +
+    geom_polygon(data = circle, aes(x=x, y=yup, group = name), fill = bck_color, size = 2) +
+    geom_polygon(data = circle, aes(x=x, y=ydown, group = name), fill = bck_color, size = 2) +
+  # circle for the portrait
+    geom_ellipse(aes(x0 = position - 2, y0 = index, a = a, b = b, angle = 0, color = category), size = 1.5) +
+  # women's name
+    geom_text(data = categories, aes(x = position, y = 1, label = category, color = category), size =18, hjust = 0, family = "yesteryear") +
+  # scales
+    scale_x_continuous(limits = c(10,125), expand = c(0,0)) + 
+    scale_color_manual(values = c("Creativity" = "#07A3AB", "Identity" = "#C8297E", "Knowledge" = "#353865", "Leadership" = "#000000"))+
+  # titles, theme etc.
+    guides(color = FALSE) +
+    labs(title = "100 inspiring and influential women of 2020",
+         caption = "Visualization : Christophe Nicault | Data : BBC  ")+
+    theme_void() +
+    theme(plot.background = element_rect(fill = bck_color, color = NA),
+          panel.background = element_rect(fill = bck_color, color = NA),
+          panel.grid = element_blank(),
+          plot.caption = element_text(family = "roboto", size = 24, margin = margin(0,20,20,0)),
+          plot.title = element_text(family = "oswald", size = 52, hjust = 0.5, color = "#353865", margin = margin(30,0,0,0)),
+          
+          )
+
+```
+
+
+```{r}
+ggsave(here::here("render", paste0("women-", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")),
+       plot = final, device = agg_png(width = 24, height = 28, units = "in", res = 300))
+
+
+dev.off()
+```
+

@@ -3,6 +3,16 @@
 
 ----
 
+## 2020 week 50 - 100 women of 2020
+
+100 inspiring and influential women of 2020
+
+![women of 2020](/2020-50-women-2020/women_2020.png)
+
+![women of 2020 zoom](/2020-50-women-2020/women_2020_zoom.png)
+
+----
+
 ## 2020 week 49 - Toronto Shelters
 
 Evolution of shelter capacity and occupancy for families between 2017 to 2019
