@@ -1,5 +1,13 @@
 # Tidy Tuesday data visualisation
 
+----
+
+## 2020 week 51 - Ninja Warrior
+
+Obstacle sequence in American Ninja Warrior
+
+![American Ninja Warrior](/2020-51-ninja-warrior/ninja-warrior.png)
+
 
 ----
 

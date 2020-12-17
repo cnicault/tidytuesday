@@ -1,0 +1,196 @@
+---
+title: "Ninja Warrior"
+author: "Christophe Nicault"
+date: "17/12/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r load_packages}
+
+library(tidyverse)
+library(ragg)
+library(ggsci)
+library(patchwork)
+library(showtext)
+library(ggtext)
+library(ggwordcloud)
+
+font_add_google("Roboto", "roboto")
+font_add_google("Oswald", "oswald")
+
+
+showtext_opts(dpi = 300)
+showtext_auto(enable = TRUE)
+
+```
+
+
+```{r load_data}
+
+ninja_warrior <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-12-15/ninja_warrior.csv')
+
+```
+
+default setting for theme
+
+```{r theme}
+
+theme_set(
+  theme_bw(base_family = "roboto")+
+     theme(plot.background = element_rect(fill = "white"),
+           panel.grid.major = element_blank(),
+           axis.title = element_blank(),
+           axis.text.y.right = element_text(size = 14, color = "#183170"))
+  )
+
+```
+
+function to generate a wordcloud for each stage
+
+```{r wordcloud}
+
+word_plot <- function(round){
+  
+  data_prep <- ninja_warrior %>%
+      filter(str_detect(round_stage, round)) %>%
+      group_by(obstacle_name) %>%
+      mutate(n_season = length(unique(season))) %>%
+      ungroup()
+  
+  if(!str_detect(round, "4")){  
+  data_prep <- data_prep %>% 
+      mutate(obstacle_tag = fct_lump_min(obstacle_name, min = 2, other_level = "Appears once"),
+             obstacle_tag = fct_lump_min(obstacle_tag, min = 3, other_level = "Appears twice"),
+             obstacle_tag = fct_lump_min(obstacle_tag, min = 4, other_level = "Appears thrice"),
+             obstacle_order = paste("Order ", obstacle_order),
+             obstacle_tag = fct_reorder(obstacle_tag, n_season))
+      values = c("Appears once" = "#afafaf", "Appears twice" = "#7f7f7f", "Appears thrice" = "#4f4f4f", pal_d3("category10")(10))
+  }else{
+      data_prep <- data_prep %>% 
+      mutate(
+         obstacle_order = paste("Order ", obstacle_order),
+         obstacle_tag = fct_reorder(obstacle_name, n_season))
+      values = c(pal_d3("category10")(10))
+  }
+  
+  data_prep <- data_prep %>%  
+    group_by(obstacle_name, obstacle_tag) %>%
+    summarise(n_season = mean(n_season)) 
+  
+  data_prep %>% 
+    ggplot() +
+    geom_text_wordcloud(aes(label = obstacle_name, size = n_season, color = obstacle_tag), eccentricity = 1) +
+    scale_size_area(max_size = 9)+
+    scale_color_manual(values = values)+
+    labs(title = round) +
+    theme_void()+
+    theme(plot.title.position = "plot",
+          plot.title = element_text(vjust = -6, family = "roboto", face = "bold", size = 20, hjust = 1, color = "#183170"),
+          panel.spacing.y = element_blank())
+}
+
+```
+
+Theme customisation depending of the stage
+
+```{r cutom_theme}
+
+custom <- function(plt, round){
+  
+  if(str_detect(round, "1")){
+    plt <- plt +
+      scale_x_discrete(position = 'top') +
+      labs(y = "Order") +
+      theme(axis.text.x.top = element_text(angle = 45, hjust = 0.5, vjust = 0.5, size = 14, color = "#183170"),
+            panel.border = element_blank(),
+            axis.ticks.x.top = element_blank(),
+            axis.title.y.right = element_text(size = 18, margin = margin(0,0,0,20), color = "#183170"))
+  }
+  if(str_detect(round, "[23]")){ 
+    plt <- plt +
+      theme(axis.text.x = element_blank(),
+            axis.title.x = element_blank(),
+            axis.ticks.x = element_blank(),
+            panel.border = element_blank())
+  }
+    
+  if(str_detect(round, "4")){
+    plt <- plt +
+      scale_x_discrete(position = 'bottom') +
+      theme(axis.text.x = element_text(angle = 45, hjust = 0.5, vjust = 0.5, size = 14, color = "#183170"),
+            panel.border = element_blank(),
+            axis.ticks.x = element_blank())
+  }
+  plt +
+    scale_y_discrete(position = 'right') +
+    theme(axis.ticks.y = element_blank())
+}
+
+```
+
+
+```{r obstacle_plot}
+
+final_plot <- function(round){
+  
+  data_prep <- ninja_warrior %>%
+  filter(str_detect(round_stage, round)) %>%
+  group_by(obstacle_name) %>%
+  mutate(n_season = length(unique(season))) %>%
+  ungroup()
+  if(!str_detect(round, "4")){  
+  data_prep <- data_prep %>% 
+    mutate(obstacle_name = fct_lump_min(obstacle_name, min = 2, other_level = "Appears once"),
+           obstacle_name = fct_lump_min(obstacle_name, min = 3, other_level = "Appears twice"),
+           obstacle_name = fct_lump_min(obstacle_name, min = 4, other_level = "Appears thrice"))
+  values = c("Appears once" = "#afafaf", "Appears twice" = "#7f7f7f", "Appears thrice" = "#4f4f4f", pal_d3("category10")(10))
+  }else{
+    values = c(pal_d3("category10")(10))
+  }
+  data_prep <- data_prep %>% mutate(obstacle_order = fct_reorder(as.character(obstacle_order), -obstacle_order),
+         obstacle_name = fct_reorder(obstacle_name, n_season),
+         season = fct_reorder(paste("Season ", season), season)) 
+  
+  final_plt <- data_prep %>% 
+  ggplot(aes(season, as.factor(obstacle_order), fill = obstacle_name)) +
+  geom_tile() +
+  scale_fill_manual(values = values) +
+  guides(fill = FALSE)
+  
+  final_plt <- custom(final_plt, round)
+  
+  (word_plot(round) + final_plt + plot_layout(widths = c(0.5,0.5), heights = c(1)))
+
+}
+
+```
+
+```{r final_plot}
+
+plt <- lapply(c(paste("Stage", 1:4)), final_plot)
+
+final <- plt[[1]] / plt[[2]] / plt[[3]] / plt[[4]] +
+  plot_layout(widths = c(1, 1, 1, 1), heights = c(9, 6, 8, 2)) +
+  plot_annotation(
+    title = "Obstacle sequence in national finals stage of American Ninja Warrior",
+    subtitle = "In grey, obstacles that appear <span style='color:#afafaf;'>**once**</span>, <span style='color:#7f7f7f;'>**twice**</span> or <span style='color:#4f4f4f;'>**thrice**</span> in the stage.",
+    caption = "Visualisation: Christophe Nicault | Data: sasukepedia",
+  theme = theme(plot.caption = element_text(family = "roboto", size = 14, color = "#183170", margin = margin(30,0,0,0)),
+                plot.title = element_textbox(family = "oswald", hjust = 0.5, size = 28, face = "bold", color = "#183170"),
+                plot.subtitle = element_textbox(family = "oswald", hjust = 0.5, size = 22, color = "#183170"))
+  )
+
+ggsave(here::here("render", paste0("ninja-", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")),
+       plot = final, device = agg_png(width = 18, height = 12, units = "in", res = 300))
+
+dev.off()
+
+```
+
+
+
