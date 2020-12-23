@@ -2,12 +2,19 @@
 
 ----
 
+## 2020 week 52 - The Big Mac Index
+
+The Big Mac Index or the burgernomics
+
+![The Big Mac Index(/2020-52-bigmac-index/bigmac_index.png)
+
+----
+
 ## 2020 week 51 - Ninja Warrior
 
 Obstacle sequence in American Ninja Warrior
 
 ![American Ninja Warrior](/2020-51-ninja-warrior/ninja-warrior.png)
-
 
 ----
 

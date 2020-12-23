@@ -1,0 +1,182 @@
+---
+title: "Tidytuesday Week 52 - Big Mac Index"
+author: "Christophe Nicault"
+date: "22/12/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(showtext)
+library(patchwork)
+library(ragg)
+
+font_add_google("Oswald", "oswald")
+font_add_google("Heebo", "heebo")
+font_add_google("DM Mono", "dmmono")
+
+showtext_opts(dpi = 300)
+showtext_auto(enable = TRUE)
+
+```
+
+```{r load_data}
+bigmac <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-12-22/big-mac.csv')
+
+```
+
+```{r data_prep}
+
+eurozone_countries <- c("Austria", "Belgium", "Cyprus", "Estonia", "Finland", "France", "Germany", "Greece", "Ireland", "Italy", "Latvia", "Lithuania", "Luxembourg", "Malta", "Netherlands", "Portugal", "Slovakia", "Slovenia", "Spain")
+
+eurozone <- tibble(iso_a3 = rep("EUZ", length(eurozone_countries)), 
+                   currency = rep("EUR", length(eurozone_countries)),
+                   name = eurozone_countries)
+
+eurozone <- eurozone %>%
+  fuzzyjoin::regex_left_join(select(maps::iso3166, mapname, a3), c(name = "mapname")) %>%
+  select(-mapname)
+
+date_list <- bigmac %>%
+  filter(iso_a3 == "EUZ") %>%
+  select(date, iso_a3) %>%
+  distinct(date, iso_a3) 
+
+eurobigmac <- date_list %>%
+  inner_join(eurozone, by = c("iso_a3")) %>% 
+  left_join(select(bigmac,-name), by = c("iso_a3", "date")) %>%
+  mutate(iso_a3 = ifelse(!is.na(a3), a3, iso_a3)) %>%
+  select(-a3)
+
+bigmac <- bigmac %>%
+  mutate(name = ifelse(name == "Euro area", "Eurozone", name)) %>%
+  bind_rows(eurobigmac)
+
+world_map <- map_data("world") %>%
+  filter(region != "Antarctica") %>%
+  as_tibble() %>%
+  fuzzyjoin::regex_left_join(maps::iso3166, c(region = "mapname")) %>%
+  left_join(filter(bigmac,date == ymd("2020-07-01")), by = c(a3 = "iso_a3"))
+
+```
+
+
+```{r chart_function}
+
+blue = "#0870A5"
+red = "#DB444B"
+
+chart <- function(country){
+
+  data <- bigmac %>%
+      filter(name == country) %>%
+      mutate(valuation = ifelse(usd_raw >= 0, "Overvalued", "Undervalued"))
+  min_axis <- ifelse(min(data$usd_raw) > 0, 0, min(data$usd_raw)) - 0.15
+  max_axis <- ifelse(max(data$usd_raw) < 0, 0, max(data$usd_raw)) + 0.15
+  min_date <- min(data$date)
+
+  data %>%
+      ggplot(aes(date, usd_raw)) +
+      geom_point(aes(color = valuation), size = 2) +
+      geom_line(color = "grey50") +
+      geom_hline(yintercept = 0, color = "grey50", linetype = "dashed") +
+      geom_text(x = min_date, y = 0.1, label = "Overvalued", hjust = 0, color = blue) +
+      geom_text(x = min_date, y = -0.1, label = "Undervalued", hjust = 0, color = red) +
+      scale_color_manual(values = c("Overvalued" = blue, "Undervalued" = red)) +
+      scale_y_continuous(limits = c(min_axis, max_axis), labels = scales::percent) +
+      guides(color = FALSE)+
+      labs(title = country) +
+      theme(plot.background = element_rect(fill = NA, color = NA),
+            panel.background = element_rect(fill = NA, color = NA),
+            axis.title = element_blank(),
+            axis.text = element_text(family = "heebo", size = 10),
+            panel.grid.minor = element_blank(),
+            panel.grid.major = element_line(color = "grey80", linetype = "dotted"),
+            plot.title = element_text(family = "heebo", size = 14))
+
+}
+  
+```
+
+
+```{r}
+
+# Help to get approximately the end of the segment between the countries on the map and the line graphs
+# not used in the plot
+centre <- map_data("world") %>% tbl_df %>% 
+  filter(region %in% c("Norway", "Switzerland", "South Africa", "Argentina", "China", "Russia", "Canada", "Mexico", "France", "New Zealand")) %>%
+  group_by(region) %>%
+  summarise(centx = mean(long),
+            centy = mean(lat))
+
+countries_lines <- tibble(x = c(-65.5,25.3,-110,-104,99.2,107, 170, 8.31,16.2,3.23),
+                          xend = c(-85, 65, -200, -200, 210, 210, 210, 170, 47, -60),
+                          y = c(-37.7, -28.8, 60, 24.2, 63.5, 35, -40.9, 46.7, 60, 46.2),
+                          yend = c(-75, -75, 70, 10, 75, 25, -50, 115, 115, 115)
+                          )
+
+
+graphs_label <- "The graphs show the evolution of the\n index between 2000 and 2020 for some\n countries around the world and the\n Eurozone."
+map_label <- "The map represents the difference in percentage\n between the exchange rate based on the price\n of a Big Mac and the actual exchange rate\n for each country in 2020.\n\n The map also shows where the index is not\n available, in most countries of Africa\n and Western and Central Asia."
+
+map <- ggplot() +
+  geom_polygon(data = world_map, aes(long, lat, group = group, fill = usd_raw), color = "grey50", size = 0.3) +
+    annotate("text",x= -350, y = 150, label = graphs_label, size = 5, hjust = 0, family = "dmmono", lineheight = 0.9) +
+    annotate("text",x= -350, y = -55, label = map_label, size = 5, hjust = 0, family = "dmmono", lineheight = 0.9) +
+  scale_fill_gradient2(low = "#F21A00", mid = "#E9C825", high = "#3B9AB2", midpoint = -0.3, labels = scales::percent, na.value="grey80") +
+  geom_segment(data = countries_lines, aes(x = x, xend = xend, y = y , yend = yend), color = "grey50", inherit.aes = FALSE) +
+  scale_x_continuous(limits = c(-350, 350), expand = c(0,0)) +
+  scale_y_continuous(limits = c(-130, 170)) +
+  labs(fill = "Big Mac Index relative to USD") +
+  guides(fill = guide_colorbar(title.position = "top",
+                               label.position = "bottom",
+                               title.hjust = 0.5,
+                               barwidth = 20)) +
+  theme_void() +
+  theme(legend.position = c(0.12, 0.12),
+        legend.direction = "horizontal",
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 10))
+
+  
+swiss <- chart("Switzerland")
+norway <- chart("Norway")
+euro_area <- chart("Eurozone")
+south_africa <- chart("South Africa")
+russia <- chart("Russia")
+china <- chart("China")
+new_zealand <- chart("New Zealand")
+argentina <- chart("Argentina")
+mexico <- chart("Mexico")
+canada <- chart("Canada")
+
+final <- map + 
+  inset_element(swiss,0.7,0.8,0.9,0.95) +
+  inset_element(norway,0.5,0.8,0.7,0.95) +
+  inset_element(euro_area,0.3,0.8,0.5,0.95) +
+  inset_element(south_africa,0.55,0.05,0.75,0.20) +
+  inset_element(russia,0.8,0.6,1,0.75) +
+  inset_element(china,0.8,0.4,1,0.55) +
+  inset_element(new_zealand,0.8,0.15,1,0.30) +
+  inset_element(argentina,0.3,0.05,0.5,0.20) +
+  inset_element(mexico,0,0.4,0.2,0.55) +
+  inset_element(canada,0,0.6,0.2,0.75) +
+  plot_annotation(
+    title = "The Big Mac Index",
+    caption = "Visualization: Christophe Nicault | Data: The Economist",
+  theme = theme(plot.caption = element_text(family = "heebo", size = 14, color = "#183170"),
+                plot.title = element_text(family = "oswald", hjust = 0.5, size = 28, face = "bold", color = "#183170", margin = margin(5,0,0,0)))
+          )
+
+ggsave(here::here("render", paste0("bigmac-", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")),
+       plot = final, device = agg_png(width = 18, height = 12, units = "in", res = 300))
+
+dev.off()
+
+```
+
