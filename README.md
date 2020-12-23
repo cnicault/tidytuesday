@@ -6,7 +6,7 @@
 
 The Big Mac Index or the burgernomics
 
-![The Big Mac Index(/2020-52-bigmac-index/bigmac_index.png)
+![The Big Mac Index](/2020-52-bigmac-index/bigmac_index.png)
 
 ----
 
