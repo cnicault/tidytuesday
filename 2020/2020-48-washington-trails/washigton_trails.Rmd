@@ -33,7 +33,7 @@ hike_data <- readr::read_rds(url('https://raw.githubusercontent.com/rfordatascie
 
 Pick up your colors
 
-```{r}
+```{r color_choices}
 # flashy
 bck_clr <- "#5ECCF3FF"
 txt_clr <- "#17406DFF"
@@ -50,7 +50,7 @@ map_unsel <- "#f7ebdc"
 
 Create the map of the USA with a different color for Washington state 
 
-```{r}
+```{r usa_map}
 require(maps)
 
 worldmap <- map_data("state") %>% tbl_df 
@@ -69,7 +69,7 @@ usamap <- worldmap %>%
 
 Template of drawing a moutain with polygons
 
-```{r}
+```{r moutain_template}
 mountain <- tibble(x = c(0,30,40,60,80,100,130),
                    y = c(0,80,60,100,60,80,0),
                   group = c("1"))
@@ -88,7 +88,7 @@ ggplot()+
 
 Data preparation
 
-```{r}
+```{r data_preparation}
 
 data <- hike_data %>%
     unnest(features) %>%
@@ -134,7 +134,8 @@ labels <- white_moutain %>%
 
 Main plot and assemble plots
 
-```{r}
+```{r plots}
+
 features_facet <- ggplot() +
   geom_polygon(data = white_moutain, aes(x = x1, y = y1, group = features), fill = "white", color = "grey50") +
   geom_polygon(data = grey_mountain, aes(x = x2, y = y2, group = features), fill = "grey70") +
@@ -161,7 +162,8 @@ final <- features_facet +
 
 Save to file
 
-```{r}
+```{r saving}
+
 ggsave(here::here("render", paste0("hikes-", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")),
        plot = final, device = agg_png(width = 10, height = 6, units = "in", res = 300))
 
