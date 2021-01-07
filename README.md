@@ -1,5 +1,14 @@
 # Tidy Tuesday data visualisation
 
+
+----
+
+## 2021 week 02 - Transit Cost Project
+
+timetable and a map of a fictitious train line with the 10 most expensive projects and the 10 with the highest cost per km.
+
+![Transit Cost Project](/2021/2021-02-transit-cost/transit_cost.png)
+
 ----
 
 ## 2020 week 52 - The Big Mac Index

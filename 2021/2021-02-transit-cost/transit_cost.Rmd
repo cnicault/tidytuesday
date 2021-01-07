@@ -1,0 +1,205 @@
+---
+title: "Tidytuesday 2021 Week 02 - Transit Cost"
+author: "Christophe Nicault"
+date: "07/01/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+
+library(tidyverse)
+library(glue)
+library(ggimage)
+library(patchwork)
+library(ggforce)
+library(showtext)
+
+font_add_google("Roboto", "roboto")
+font_add_google("Oswald", "oswald")
+font_add_google("Heebo", "heebo")
+font_add_google("DM Mono", "dmmono")
+
+showtext_opts(dpi = 300)
+showtext_auto(enable = TRUE)
+```
+
+
+```{r data}
+
+transit_cost <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-01-05/transit_cost.csv')
+
+underground <- here::here("2021", "2021-02-transit-cost","underground.png")
+
+```
+
+```{r parameters}
+
+bck_color <- "#FEFCEF"
+
+```
+
+```{r data_preparation}
+
+transit_cost[which(transit_cost$country == "UK"),"country"] <- "GB"
+
+transit_cost <- transit_cost %>%
+  mutate(country_name = countrycode::countrycode(country, origin = "iso2c", destination ="country.name"),
+         real_cost = as.numeric(real_cost),
+         start_year = as.numeric(start_year),
+         end_year = as.numeric(end_year))
+
+cost_km <- transit_cost %>%
+  slice_max(cost_km_millions, n = 10)
+cost_global <- transit_cost %>%
+  slice_max(real_cost, n = 10) 
+
+transit <- cost_km %>%
+  bind_rows(cost_global) %>%
+  mutate(label = glue("{line} ({city})"),
+         label = fct_reorder(label, -start_year),
+         end_label = ifelse(is.na(end_year), "?", "|"),
+         start_label = "|",
+         end_year = ifelse(is.na(end_year), 2030, end_year))
+
+
+grid <- expand.grid(x = seq(min(transit$start_year), max(transit$end_year), 1), y = transit$label)
+grid <- grid %>%
+  left_join(select(transit, label, end_label, start_label, start_year, end_year), by=c("y" = "label")) %>%
+  mutate(tile_sign = case_when(
+    x == start_year ~ start_label,
+    x == end_year ~ end_label,
+    x > start_year & x < end_year ~ "--",
+    TRUE ~ ""
+  ))
+
+```
+
+
+```{r}
+
+## highest cost
+
+p1<- transit_cost %>%
+  slice_max(real_cost, n = 10) %>%
+  mutate(label = glue("{line} \n ({city} - {country_name})"),
+         label = fct_reorder(label, real_cost)) %>% 
+  mutate(size = scales::rescale(round((real_cost+1)*3), to = c(2,6))) %>%
+  ggplot() +
+  geom_text(aes(x =2,  y = label, label = glue("{scales::comma(round(real_cost,0))} M$"), size = size), hjust = 0, family = "roboto") +
+  geom_image(aes(x = 0.1, y = label), image = underground, size = 0.13, asp = 0.4) +
+  scale_x_continuous(limits = c(0,3), expand = c(0.1,0.1)) +
+  scale_size(range = c(4.5, 6), guide = F) +
+  theme_void() +
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        axis.text.y = element_text(family = "oswald", size = 12, hjust = 1, margin = margin(0,-10,0,0)))
+
+
+# highest cost / km
+
+p2 <- transit_cost %>%
+  slice_max(cost_km_millions, n = 10) %>%
+  mutate(label = glue("{line} \n ({city} - {country_name})"),
+         label = fct_reorder(label, -cost_km_millions)) %>% 
+  mutate(size = scales::rescale(round((cost_km_millions+1)*3), to = c(2,6))) %>%
+  ggplot() +
+  geom_text(aes(x = label, y = 0.6, label = glue("{scales::comma(round(cost_km_millions,0))} M$"), size = size), angle = 45, vjust = 1, family = "roboto") +
+    geom_image(aes(x = label, y = 2.6), image = underground, size = 0.04, asp = 3.5) +
+  scale_size(range = c(4.5, 6), guide = F) +
+  scale_x_discrete(position = "top", expand = c(0.1,0.1)) +
+  scale_y_continuous(limits = c(0, 3)) +
+  theme_void() +
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        axis.text.x = element_text(family = "oswald", size = 12, angle = 45, hjust = 0, vjust = 0, margin = margin(0,0,-10,0)),
+        )
+
+# timeline as a timetable
+
+p3 <- grid %>%
+  ggplot() +
+  geom_tile(aes(x = x, y = y), width = 0.9, height = 0.9, inherit.aes = FALSE) +
+  geom_text(aes(x= x, y =y, label = tile_sign), color = "orange", size = 6, fontface = "bold") +
+  labs(title = "\"Cost Line\" Timetable",
+       subtitle = "Departures / Arrivals") +
+  theme_void() +
+  theme(plot.background = element_rect(fill = "grey30", color = "black", size = 3),
+    axis.text = element_text(family = "dmmono", size = 12, color = "orange", hjust = 1),
+    plot.title = element_text(family = "dmmono", size = 18, face = "bold", color = "orange", margin = margin(10,0,0,0)),
+    plot.subtitle = element_text(family = "dmmono", size = 16, face = "bold", color = "orange", margin = margin(10,0,10,0)),
+    plot.margin = margin(10,10,10,10))
+
+
+# background with rails
+  
+railbck <- tibble(x = c(seq(0,70,3), rep(87,23)),
+               xend = c(seq(0,70,3), rep(94,23)),
+               y = c(rep(7,24),seq(32,100,3)),
+               yend = c(rep(14,24),seq(32,100,3)))
+
+railbck2 <- tibble(x = c(0,0,88,93),
+               xend = c(71.5,71.5,88,93),
+               y = c(8,13,29,29),
+               yend = c(8,13,100,100))
+
+sign <- tibble(x =c(76, 95),
+               xend = c(93, 95),
+               y = c(5, 7),
+               yend = c(5, 25))
+
+stations <- tibble(x = c(seq(78, 92, 2), rep(95, 9)),
+                   y = c(rep(5,8), seq(8, 24, 2)))
+
+tunnel_rect <- tibble(xmin = c(66, 86),
+                      xmax = c(70, 96),
+                      ymin = c(5, 30),
+                      ymax = c(17, 35)
+                      )
+
+tunnel_elli <- tibble(x0 = c(70, 90.5),
+                      y0 = c(10.5, 30),
+                      a = c(2, 4),
+                      b = c(5, 3))
+
+background <- ggplot() +
+  geom_ellipse(data = tunnel_elli, aes(x0 = x0, y0 = y0, a = a, b = b, angle = 0), fill = "black")+
+  geom_rect(data = tunnel_rect, aes(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax), fill = bck_color, color = NA) +
+  geom_curve(aes(x= 70, xend = 86.5, y = 15.5, yend = 30), curvature = 0.3, color = "grey50") +
+  geom_segment(data = railbck, aes(x = x, xend = xend , y = y , yend = yend), size = 3, color = "#A15120", inherit.aes = TRUE) +
+  geom_segment(data = railbck2, aes(x = x, xend = xend , y = y , yend = yend), size = 1.5, color = "#666666", inherit.aes = TRUE) +
+  geom_segment(data = sign, aes(x = x, xend = xend , y = y , yend = yend), size =3, color = "red", inherit.aes = TRUE) +
+  geom_curve(data = NULL, aes(x= 93, xend = 95, y = 5, yend = 7), curvature = 0.5, size = 3, color = "red") +
+  geom_point(data = stations, aes(x, y), color = "white") +
+  annotate("text",label = "Higher cost per km", x = 80, y = 2, hjust = 0, family = "oswald", color = "red", size = 6) +
+  annotate("text",label = "Most expensive projects", x = 97, y = 15, angle = 90, family = "oswald", color = "red", size = 6) +
+  annotate("text",label = "\"Cost Line\"\n directions", x = 86,y = 15, angle = 45, family = "oswald", color = "red", size = 8) +
+  scale_x_continuous(limits = c(0,100)) +
+  scale_y_continuous(limits = c(0,100)) +
+  theme_void() +
+  theme(plot.background = element_rect(fill = bck_color, color = NA))
+
+
+
+final <- background +
+  inset_element(p1, 0.68,0.30,1,0.98) +
+  inset_element(p2,0,0,0.7,0.35) +
+  inset_element(p3, 0.02,0.35,0.65,0.98) +
+  plot_annotation(caption = "Visualization: Christophe Nicault | Data: TransitCosts.com",
+  theme = theme(plot.caption = element_text(family = "heebo", size = 14, color = "black"),
+                plot.background = element_rect(fill = bck_color)
+          ))
+  
+ragg::agg_png(here::here("render", paste0("transit-", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")), 
+             width = 16, height = 12, units = "in", res = 320)
+final
+
+dev.off()
+
+
+```
+
