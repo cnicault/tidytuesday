@@ -1,0 +1,192 @@
+---
+title: "art_collections"
+author: "Christophe Nicault"
+date: "14/01/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load_packages}
+
+library(tidyverse)
+library(glue)
+library(ggforce)
+library(cowplot)
+library(showtext)
+library(ggtext)
+library(scales)
+
+font_add_google("Roboto", "roboto")
+font_add_google("Oswald", "oswald")
+font_add_google("Heebo", "heebo")
+font_add_google("Lobster", "lobster")
+
+showtext_opts(dpi = 300)
+showtext_auto(enable = TRUE)
+
+```
+
+
+```{r load_data}
+
+artwork <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-01-12/artwork.csv')
+artists <- readr::read_csv("https://github.com/tategallery/collection/raw/master/artist_data.csv")
+
+```
+
+
+```{r parameters}
+
+strip_clr <- "grey40"
+perc_clr <- "grey60"
+male_clr <- "#00C4AA"
+female_clr <- "#8700F9"
+
+```
+
+
+```{r}
+
+art <- artwork %>%
+  left_join(artists, by = c("artistId" = "id"))
+
+# Proportion for all decades for artworks
+
+prop_artwork <- art %>%
+  filter(artistId != 558, !is.na(acquisitionYear), !is.na(gender)) %>%
+  filter(acquisitionYear > 1900) %>%
+  mutate(dec = round(acquisitionYear/10)*10) %>%
+  group_by(dec, gender) %>%
+  summarise(total = n()) %>%
+  ungroup() %>%
+  pivot_wider(id_cols = "dec", names_from = "gender", values_from = "total") %>%
+  mutate(Female = replace_na(Female, 0)) %>%
+  mutate(r_fem = sqrt(Female/pi),
+         r_mal = sqrt(Male/pi),
+         decade = ifelse(dec < 2010, glue("{dec} - {dec+9}"), glue("{dec} - 2012")),
+         decade = fct_reorder(decade, -dec),
+         perc_male = percent(Male / (Male + Female),2),
+         perc_female = percent(Female / (Male + Female),2)) 
+
+# Proportion for all decades for artists
+
+prop_artist <- art %>%
+  filter(artistId != 558, !is.na(acquisitionYear), !is.na(gender)) %>%
+  filter(acquisitionYear > 1900) %>%
+  mutate(dec = round(acquisitionYear/10)*10) %>%
+  distinct(dec, artistId, gender) %>%
+  group_by(dec, gender) %>%
+  summarise(total = n())%>%
+  ungroup() %>%
+  pivot_wider(id_cols = "dec", names_from = "gender", values_from = "total") %>%
+  mutate(Female = replace_na(Female, 0)) %>%
+  mutate(r_fem = sqrt(Female/pi),
+         r_mal = sqrt(Male/pi),
+         decade = ifelse(dec < 2010, glue("{dec} - {dec+9}"), glue("{dec} - 2012")),
+         decade = fct_reorder(decade, -dec),
+         perc_male = percent(Male / (Male + Female),2),
+         perc_female = percent(Female / (Male + Female),2)) 
+
+
+# plot acquisition by genre over decades
+
+plt_art <- ggplot() +
+  geom_circle(data = prop_artwork, aes(x0 = 0, y0 = r_mal, r = r_mal), fill = male_clr, color = NA) +
+  geom_text(data = prop_artwork, aes(-r_mal*0.80 - 3, r_mal * 1.80 + 3, label = perc_male), size = 6, hjust = 1, family = "oswald", color = perc_clr) +
+  geom_circle(data = prop_artwork, aes(x0 = r_mal + r_fem, y0 = r_mal, r = r_fem), fill = female_clr, color = NA) +
+  geom_text(data = prop_artwork, aes(r_mal+ r_fem +3, r_mal+r_fem + 8, label = perc_female), size = 6, hjust = 0, family = "oswald", color = perc_clr) +
+  geom_circle(data = prop_artist, aes(x0 = 0, y0 = -r_mal, r = r_mal), fill = male_clr, color = NA) +
+  geom_text(data = prop_artist, aes(-r_mal - 5, -r_mal, label = perc_male), size = 6, hjust = 1, family = "oswald", color = perc_clr) +
+  geom_circle(data = prop_artist, aes(x0 = r_mal + r_fem, y0 = -r_mal, r = r_fem), fill = female_clr, color = NA) +  
+  geom_text(data = prop_artist, aes(r_mal + 2* r_fem + 5, -r_mal, label = perc_female), size = 6, hjust = 0, family = "oswald", color = perc_clr) +
+  facet_wrap(~decade, strip.position="bottom") +
+  scale_x_continuous(limits= c(-65,85)) +
+  coord_fixed() +
+  theme_void() +
+  theme(plot.margin = margin(0,0,0,0),
+        panel.spacing.y = unit(0, "lines"),
+        panel.spacing.x = unit(2, "lines"),
+        strip.text.x = element_text(family = "oswald", face = "bold", size = 14, color = strip_clr, margin = margin(10,0,0,0))) 
+  
+
+# Proportions for artists for the whole dataset
+
+gen_artist <- artists %>%
+  count(gender) %>%
+  pivot_wider(names_from = "gender", values_from = "n") %>%
+  mutate(r_fem = sqrt(Female/pi),
+         r_mal = sqrt(Male/pi),
+         perc_male = percent(Male / (Male + Female),2),
+         perc_female = percent(Female / (Male + Female),2)) 
+
+# Proportions for artworks for the whole dataset
+
+gen_artwork <- art %>%
+  filter(artistId != 558, !is.na(acquisitionYear), !is.na(gender)) %>%
+  count(gender) %>%
+  pivot_wider(names_from = "gender", values_from = "n") %>%
+  mutate(r_fem = sqrt(Female/pi),
+         r_mal = sqrt(Male/pi),
+         perc_male = percent(Male / (Male + Female),2),
+         perc_female = percent(Female / (Male + Female),2)) 
+
+
+legend <- glue("The <span style='color:{female_clr}'>female artists</span> represents 16% of the artists in Tate Museum,<br> and 10 % of the artworks (exluding J. M. W. Turner who accounts<br> for 56% of the artworks).<br><br>Below is the gender distribution of the artists and their artworks<br> acquired in each decade since 1900.<br><br> The proportion of <span style='color:{female_clr}'>female artists</span> has increased over the last 4 <br>decades, but is still very low compared to the <span style='color:{male_clr}'>male artists</span>.")
+
+# Main plot
+
+main_plt <- ggplot() +
+  geom_circle(data = gen_artist, aes(x0 = 0, y0 = -r_mal, r = r_mal), fill = male_clr, color = NA) +
+  geom_text(data = gen_artist, aes(-r_mal - 5, -r_mal, label = perc_male), size = 6, hjust = 1, family = "oswald", color = perc_clr) +
+  geom_circle(data = gen_artist, aes(x0 = r_mal + r_fem, y0 = -r_mal, r = r_fem), fill = female_clr, color = NA) +
+  geom_text(data = gen_artist, aes(r_mal + 2* r_fem + 5, -r_mal, label = perc_female), size = 6, hjust = 0, family = "oswald", color = perc_clr) +
+  geom_circle(data = gen_artwork, aes(x0 = 0, y0 = r_mal, r = r_mal), fill = male_clr, color = NA) +
+  geom_text(data = gen_artwork, aes(-r_mal*0.80 - 3, r_mal * 1.80 + 3, label = perc_male), size = 6, hjust = 1, family = "oswald", color = perc_clr) +
+  geom_circle(data = gen_artwork, aes(x0 = r_mal + r_fem, y0 = r_mal, r = r_fem), fill = female_clr, color = NA) +
+  geom_text(data = gen_artwork, aes(r_mal+ r_fem +10, r_mal+r_fem + 10, label = perc_female), size = 6, hjust = 0, family = "oswald", color = perc_clr) +
+  geom_segment(aes(x = -160, xend = -160, y = 4 , yend = 2 * gen_artwork$r_mal + 6), size = 0.5, color = "grey40") +
+  geom_segment(aes(x = -160, xend = -210, y = gen_artwork$r_mal, yend =  gen_artwork$r_mal + 30), size = 0.5, color = "grey40") +
+  annotate("text", x = -220, y = gen_artwork$r_mal + 30, label = "Proportion of artwork \n for each gender", size = 4.5, hjust = 1, family = "roboto") +
+  geom_segment(aes(x = -160, xend = -160, y = -4 , yend =  - 2 * gen_artist$r_mal - 6), size = 0.5, color = "grey40") +
+  geom_segment(aes(x = -160, xend = -210, y = -gen_artist$r_mal, yend =  -gen_artist$r_mal), size = 0.5, color = "grey40") +
+  annotate("text", x = -220, y = -gen_artist$r_mal, label = "Proportion of artist \n for each gender", size = 4.5, hjust = 1, family = "roboto") +
+  geom_richtext(aes(x = 230, y = 80), label = legend, size = 4.5, hjust = 0, family = "roboto", fill = NA, label.color=NA) +
+  coord_fixed() +
+  scale_x_continuous(limits = c(-430,800)) +
+  scale_y_continuous(limits = c(-950,250)) +
+  labs(title = "Representation of artists gender and artworks",
+       subtitle = "at the Tate Museum since 1900",
+       caption = "Visualization: Christophe Nicault | Data: Tate Collection") +
+  theme_void() +
+  theme(plot.background = element_rect(fill = "#F0F0F0", color = NA),
+        plot.margin = margin(0,0,0,0),
+        plot.title = element_text(family = "lobster", face = "bold", size = 26, hjust = 0.5, color = "grey30", margin = margin(10,0,0,0)),
+        plot.subtitle = element_text(family = "lobster", face = "bold", size = 26, hjust = 0.5, color = "grey30"),
+        plot.caption = element_text(family = "heebo", size = 12, hjust = 0.95, margin = margin(0,0,5,0)),
+        plot.caption.position = "plot")
+
+
+final <- main_plt +
+  draw_plot(plt_art, -450, -1000, 1250, 900)
+  
+
+ggsave(here::here("render", paste("art", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")), plot = final, width = 10.8, height = 11.6, dpi = 320, type = "cairo")
+
+
+# bug in patchwork when changing coordinate (due to coord_fixed() here) : https://stackoverflow.com/questions/65208689/how-to-embed-a-map-using-the-inset-element-function-from-the-patchwork-package
+
+# final <- main +
+#   inset_element(plt_art, 0, 0.01, 1, 0.7, align_to = "full", clip = FALSE)  +
+#   plot_annotation(caption = "Visualization: Christophe Nicault | Data: TransitCosts.com",
+#   theme = theme(plot.caption = element_text(family = "heebo", size = 14, color = "black")
+#           ))
+# final$patches$layout$widths  <- 1
+# final$patches$layout$heights <- 1
+# 
+# ggsave(here::here("render", paste("art", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")), plot = final, width = 12, height = 12, dpi = 320)
+
+```
+
