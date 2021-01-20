@@ -1,6 +1,12 @@
 # Tidy Tuesday data visualisation
 
 
+## 2021 week 04 - Kenya Census
+
+Distribution of the sources of water for each county in Kenya
+
+![Water sources in Kenya](/2021/2021-04-Kenya-census/kenya_census.png)
+
 ----
 
 ## 2021 week 03 - Art Collections

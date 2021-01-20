@@ -1,0 +1,168 @@
+---
+title: "Kenya Census"
+author: "Christophe Nicault"
+date: "20/01/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load_packages}
+
+library(tidyverse)
+library(janitor)
+#remotes::install_github("Shelmith-Kariuki/rKenyaCensus")
+library(rKenyaCensus)
+library(ggstream)
+library(paletteer)
+library(patchwork)
+library(showtext)
+
+font_add_google("Roboto", "roboto")
+font_add_google("Oswald", "oswald")
+font_add_google("Heebo", "heebo")
+
+showtext_opts(dpi = 300)
+showtext_auto(enable = TRUE)
+
+```
+
+```{r load_data}
+
+water <- rKenyaCensus::V4_T2.15
+
+water <- clean_names(water)
+
+```
+
+
+```{r parameters}
+
+kenya_pal <- rev(c("#006300","#257D25", "#35B035","#97FC97", "#FFFFFF","#B50000", "#C20000", "#9C0000", "#F04848", "#FFFFFF", "#D6D6D6","#999999","#4D4D4D","#000000"))
+
+map_bck_clr <- "#BAE7F7"
+map_neutral <- "grey40"
+
+```
+
+
+```{r data_preparation}
+
+water_clean <- water %>%
+  ungroup() %>%
+  filter(county != "xxx", admin_area == "County") %>%
+  select(-not_stated) %>%
+  pivot_longer(cols = pond:publictap_standpipe, names_to = "source", values_to = "value") %>%
+  filter(!is.na(value)) %>%
+  mutate(
+    source = case_when(
+      source == "borehole_tube_well" ~ "Borehole\ntubewell",
+      source == "bottledwater" ~ "Bottled\n water",
+      source == "dam_lake" ~ "Dam lake",
+      source == "pipedintodwelling" ~ "Piped into\ndwelling",
+      source == "pipedtoyard_plot" ~ "Piped to\nyard/plot",
+      source == "pond" ~"Pond",
+      source == "publictap_standpipe" ~"public \ntap/standpipe",
+      source == "rain_harvestedwater" ~ "Rain harvested\n / water",
+      TRUE ~ str_replace_all(str_to_title(source), "_", "\n")
+    )
+  )
+
+```
+
+```{r stream_chart}
+
+water_prep <- water_clean %>%
+  arrange(county) %>%
+  mutate(x_num = as.numeric(as_factor(county)),
+         x_labels = county) 
+
+county_breaks <- water_prep$x_num
+county_labels <- water_prep$x_labels
+
+plt <-  water_prep %>%
+  ggplot() +
+  geom_stream(aes(x_num, value, fill = source, color = source))  +
+  scale_x_continuous(breaks = county_breaks, labels = county_labels)+
+  scale_fill_manual(values = kenya_pal) +
+  scale_color_manual(values = kenya_pal) +
+  guides(fill = FALSE, color = FALSE) +
+  theme_void() +
+  theme(axis.text.x = element_text(family = "roboto",angle = 90, hjust = 1, size = 13),
+        plot.margin = margin(20,0,30,0))
+
+```
+
+
+```{r map_prep}
+
+map = rKenyaCensus::KenyaCounties_SHP %>%
+  sf::st_as_sf() %>%
+  clean_names()
+
+water_map <- water_clean %>%
+  group_by(source) %>%
+  slice_max(value,n = 10)
+
+source_list <- water_map %>%
+  select(source) %>%
+  arrange() %>%
+  pull() %>% unique()
+
+color_pal <- c()
+color_pal[source_list] <- kenya_pal
+
+map_source1 <- map %>%
+  right_join(filter(water_map, source %in% source_list[1:7]))
+
+map_source2 <- map %>%
+  right_join(filter(water_map, source %in% source_list[8:14]))
+
+```
+
+```{r final}
+
+map1_plt <-  ggplot() +
+  geom_sf(data = map, fill = map_bck_clr, size = 0.2, alpha = 0.3, color = "black") +
+  geom_sf(data = map_source1, aes(fill = source), size = 0.3, color = map_neutral) +
+  scale_fill_manual(values = color_pal) +
+  facet_wrap(~source, nrow = 1, strip.position="top") +
+  guides(fill = FALSE) +
+  theme_void() +
+  theme(panel.spacing.x = unit(2, "lines"),
+        strip.text.x = element_text(family = "roboto", size = 18, margin = margin(0,0,5,0)))
+
+map2_plt <-  ggplot() +
+  geom_sf(data = map, fill = map_bck_clr, size = 0.2, alpha = 0.3, color = "black") +
+  geom_sf(data = map_source2, aes(fill = source), size = 0.3, color = map_neutral) +
+  scale_fill_manual(values = color_pal) +
+  facet_wrap(~source, nrow = 1, strip.position="bottom") +
+  guides(fill = FALSE) +
+  theme_void() +
+  theme(panel.spacing.x = unit(2, "lines"),
+        strip.text.x = element_text(family = "roboto", size = 18, margin = margin(5,0,5,0)))
+
+final <- map1_plt / plt / map2_plt +
+  plot_layout(nrow = 3, heights = c(1,3,1)) +
+  plot_annotation(
+    title = "Distribution of the sources of water for each county in Kenya",
+    subtitle = "The maps represent the 10 counties with the highest values for each water source.\n The sources and colors for each map match with the stream chart, from left to right, top to bottom.",
+    caption = "Visualization: Christophe Nicault | Data: rKenyaCensus",
+    theme = theme(
+      plot.title = element_text(family = "oswald", size = 32, hjust = 0.5, margin = margin(10,0,10,0)),
+      plot.subtitle = element_text(family = "roboto", size = 20, hjust = 0.5, margin = margin(0,0,40,0)),
+      plot.caption = element_text(family = "heebo", size = 16, color = "black", margin = margin(20,0,0,0))
+            )
+  )
+
+
+ragg::agg_png(here::here("render", paste("kenya", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")), width = 16, height = 16, res = 320, units= "in")
+
+final
+
+dev.off()
+
+```
+
