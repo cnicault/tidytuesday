@@ -1,0 +1,179 @@
+---
+title: "Plastic Pollution"
+author: "Christophe Nicault"
+date: "27/01/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r load_packages}
+
+library(tidyverse)
+library(patchwork)
+library(showtext)
+
+font_add_google("Roboto", "roboto")
+font_add_google("Oswald", "oswald")
+font_add_google("Heebo", "heebo")
+font_add_google("Share Tech Mono", "techmono")
+
+showtext_opts(dpi = 320)
+showtext_auto(enable = TRUE)
+
+```
+
+```{r theme}
+
+bck_clr <- "#FFF2E4"
+#FFF2D4
+#FFF2DC
+#FFF2E4
+
+theme_update(
+        plot.background = element_rect(fill = bck_clr, color = NA),
+        panel.background = element_blank(),
+        axis.title.y = element_blank(),
+        axis.title.x = element_text(color = "grey30", size = 12, margin = margin(15,0,0,0)),
+        axis.text.x = element_text(color = "grey30", size = 10),
+        axis.ticks.x = element_blank(),
+        axis.ticks.y = element_blank(),
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.x = element_line(linetype = "14", size = 0.3, color = "grey20"),
+        panel.grid.minor.x = element_blank(),  
+)
+```
+
+
+```{r load_data}
+plastics <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-01-26/plastics.csv')
+
+```
+
+```{r data_preparation}
+
+# differences in volunteers
+
+dif_participation <- plastics %>%
+  group_by(country, year) %>%
+  summarise(year_events = mean(num_events, na.rm = TRUE),
+            year_volunteers = mean(volunteers, na.rm = TRUE)) %>%
+  pivot_wider(id = "country", names_from = "year", values_from = c("year_events", "year_volunteers")) %>%
+  ungroup() %>%
+  mutate(diff_volunteers = year_volunteers_2020 - year_volunteers_2019)
+
+# differences in plastic collection
+
+collect <- plastics %>%
+  filter(parent_company != "Grand Total") %>%
+  group_by(country, year) %>%
+  summarise(across(hdpe:grand_total, sum)) %>%
+  ungroup() %>%
+  pivot_wider(id = "country", names_from = "year", values_from = "grand_total") %>%
+  mutate(
+    year_2019 = `2019`,
+    year_2020 = `2020`,
+    diff = year_2020 - year_2019)
+
+# Offset for the year labels
+
+offset_vol <- 300
+offset_col <- 2500
+
+#  Final dataset
+
+max <- dif_participation %>%
+  left_join(collect) %>%
+  slice_max(diff_volunteers, n = 10)
+
+plastic_summary <- dif_participation %>%
+  left_join(collect) %>%
+  slice_min(diff_volunteers, n = 10) %>%
+  bind_rows(max) %>%
+  mutate(country = fct_reorder(country, abs(diff_volunteers))) %>%
+  mutate(sign_vol = ifelse(diff_volunteers > 0, "pos", "neg"),
+         sign_vol_center = ifelse(diff_volunteers > 0, "poslight", "neglight"),
+         sign_col = ifelse(diff > 0, "pos", "neg"),
+         sign_col_center = ifelse(diff > 0, "poslight", "neglight"),         
+         vol_2019_label = ifelse(diff_volunteers > 0, -offset_vol, offset_vol),
+         vol_2020_label = - vol_2019_label,
+         col_2019_label = ifelse(diff > 0, -offset_col, offset_col),
+         col_2020_label = - col_2019_label)
+
+
+
+```
+
+```{r plot}
+
+# transformation function to invert the x axis
+
+opposite <- scales::trans_new(
+                "opposite",
+                transform = function(x) -x,
+                inverse = function(x) -x
+              )
+
+
+volunteers_plt <- plastic_summary %>%
+  ggplot() +
+  geom_point(aes(x = year_volunteers_2019, country, color = sign_vol), size = 5)+
+  geom_point(aes(x = year_volunteers_2020, country, color = sign_vol), size = 5)+
+  geom_segment(aes(x= year_volunteers_2019, xend = year_volunteers_2020, y = country, yend = country, color = sign_vol), size = 4) +
+  geom_point(aes(x = year_volunteers_2019, country, color = sign_vol_center), size = 2)+
+  geom_point(aes(x = year_volunteers_2020, country, color = sign_vol_center), size = 2)+
+  geom_segment(aes(x= year_volunteers_2019, xend = year_volunteers_2020, y = country, yend = country, color = sign_vol_center), size = 1) +  
+  geom_text(aes(x = year_volunteers_2019 + vol_2019_label, y = country, label = "2019"), color = "grey30", size = 3, alpha = 0.6, fontface = "bold") +
+  geom_text(aes(x = year_volunteers_2020 + vol_2020_label, y = country, label = "2020"), color = "grey30", size = 3, alpha = 0.6, fontface = "bold") +
+  geom_text(aes(x = (year_volunteers_2020 + year_volunteers_2019)/2, y = country, label = diff_volunteers, color = sign_vol), size = 3.5, nudge_y = 0.4, fontface = "bold") +
+  scale_color_manual(values = c("pos" = "#135B91", "poslight" = "#599BCE", "neg" = "#BF363A", "neglight" = "#F48E91")) +
+  scale_x_continuous(breaks = seq(0,7000,1000), expand = c(0.08, 0.1)) +
+  guides(color = FALSE) +
+  labs(x = "Number of volunteers") +
+  theme(axis.text.y = element_text(hjust = 0.5, family = "oswald", size = 14, face = "bold"),
+        )
+
+
+collection_plt <- plastic_summary %>%
+  ggplot() +
+  geom_point(aes(x = year_2019, country, color = sign_col), size = 5)+
+  geom_point(aes(x = year_2020, country, color = sign_col), size = 5)+
+  geom_segment(aes(x= year_2019, xend = year_2020, y = country, yend = country, color = sign_col), size = 4) +
+    geom_point(aes(x = year_2019, country, color = sign_col_center), size = 2)+
+  geom_point(aes(x = year_2020, country, color = sign_col_center), size = 2)+
+  geom_segment(aes(x= year_2019, xend = year_2020, y = country, yend = country, color = sign_col_center), size = 1) +
+  geom_text(aes(x = (year_2019 + col_2019_label), y = country, label = "2019"), color = "grey30", size = 3, alpha = 0.6, fontface = "bold") +
+  geom_text(aes(x = (year_2020 + col_2020_label), y = country, label = "2020"), color = "grey30", size = 3, alpha = 0.6, fontface = "bold") +
+  geom_text(aes(x = (year_2020 + year_2019)/2, y = country, label = diff, color = sign_col), size = 3.5, nudge_y = 0.4, fontface = "bold") +  
+  scale_color_manual(values = c("pos" = "#135B91", "poslight" = "#599BCE", "neg" = "#BF363A", "neglight" = "#F48E91")) +
+  scale_x_continuous(trans = opposite, breaks = seq(0,60000,10000), expand = c(0.1, 0.08)) +
+  guides(color = FALSE) +
+  labs(x = "Number of plastics ( count )") +
+  theme(
+        axis.text.y = element_blank(),
+        )
+
+
+final <- collection_plt + volunteers_plt +
+  plot_annotation(
+    title = "Impact of the evolution of volunteers on plastic collection between 2019 and 2020",
+    subtitle = "The 20 countries selected represent the 10 countries with the highest positive difference\n and the 10 countries with the highest negative difference of volunteers between 2019 and 2020.\n For each of these countries, the left graph shows the impact on the number of plastic collected.",
+    caption = "Visualization: Christophe Nicault | Data: Break Free from Plastic",
+    theme = theme(
+      plot.background = element_rect(fill = bck_clr, color = NA),
+      plot.title = element_text(family = "oswald", size = 18, hjust = 0.5, margin = margin(10,0,10,0)),
+      plot.subtitle = element_text(family = "roboto", size = 14, hjust = 0.5, margin = margin(0,0,25,0), lineheight = 1.1),
+      plot.caption = element_text(family = "techmono", size = 10, color = "grey30", margin = margin(15,0,0,0))      
+    )
+  )
+
+
+ragg::agg_png(here::here("render", paste("plastics", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")), width = 16, height = 10, res = 320, units= "in")
+final
+dev.off()
+
+```
