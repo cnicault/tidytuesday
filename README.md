@@ -1,6 +1,6 @@
 # Tidy Tuesday data visualisation
 
-## 2021 week 06 - Plastic Pollution
+## 2021 week 06 - HBCU Enrollment
 
 Evolution of graduation in HBCU for each race / ethnicity
 
