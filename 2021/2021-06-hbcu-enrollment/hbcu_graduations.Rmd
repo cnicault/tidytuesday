@@ -1,0 +1,221 @@
+---
+title: "HBCU graduations"
+author: "Christophe Nicault"
+date: "03/02/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load_packages}
+
+library(tidyverse)
+library(cowplot)
+library(ggforce)
+library(scales)
+library(showtext)
+
+
+font_add_google("Roboto", "roboto")
+font_add_google("Oswald", "oswald")
+font_add_google("Share Tech Mono", "techmono")
+
+showtext_opts(dpi = 320)
+showtext_auto(enable = TRUE)
+
+```
+
+```{r load_data}
+
+hs_students <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-02-02/hs_students.csv')
+bach_students <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-02-02/bach_students.csv')
+
+```
+
+```{r data_preparation}
+
+hs_total <- hs_students %>% 
+  mutate(Total = if_else(Total > 10000, str_sub(Total, 1, 4) %>% as.double(), Total)) %>% 
+  rename(year = Total) %>% 
+  select(!contains("Standard")) %>% 
+  select(!contains("Total")) %>% 
+  mutate(across(White1:last_col(), as.double)) %>% 
+  pivot_longer(cols = 2:last_col(), names_to = "group", values_to = "total") %>% 
+  filter(year >= 1980)
+
+bach_total <- bach_students %>% 
+  mutate(Total = if_else(Total > 10000, str_sub(Total, 1, 4) %>% as.double(), Total)) %>% 
+  rename(year = Total) %>% 
+  select(!contains("Standard")) %>% 
+  select(!contains("Total")) %>% 
+  mutate(across(White1:last_col(), as.double)) %>% 
+  pivot_longer(cols = 2:last_col(), names_to = "group", values_to = "total") %>% 
+  filter(year >= 1980)
+
+```
+
+```{r select_students}
+
+# to plot for bachelor instead of highschool, comment the first pblock with hs_total 
+# and uncomment the block with bach_total
+# Don't forget to change the title in main_plot (comment / uncomment)
+
+hbcu_students <- hs_total %>%
+  mutate(group = str_replace(group, "1", ""),
+         group = str_replace(group, "/\r", ""),
+         group = str_replace(group, " - ", "\n")) %>%
+  group_by(group) %>%
+  arrange(group, year) %>%
+  mutate(perc = c(NA,diff(total)),
+         sign = ifelse(perc < 0, "neg", "pos")) %>%
+  ungroup()
+
+# hbcu_students <- bach_total %>%
+#   mutate(group = str_replace(group, "1", ""),
+#          group = str_replace(group, "/\r", ""),
+#          group = str_replace(group, " - ", "\n")) %>%
+#   group_by(group) %>%
+#   arrange(group, year) %>%
+#   mutate(perc = c(NA,diff(total)),
+#          sign = ifelse(perc < 0, "neg", "pos")) %>% 
+#   ungroup()
+
+```
+
+
+```{r data_transformation}
+
+group <- unique(hbcu_students$group)
+
+date <- tibble(x = seq(1990,2010,10),
+               y = rep(-1,3),
+               label = c("1990", "2000", "2010"))
+
+# function to plot the different graphs
+plot_diff <- function(group, df){
+  
+  df %>%
+    filter(group == !!group) %>%
+    ggplot(aes(year, perc, fill = sign)) +
+    geom_col() +
+    geom_text(data = date, aes(x = x, y = y, label = label), hjust = 0.5, size = 3, inherit.aes = FALSE) + 
+    geom_hline(yintercept = 0)+
+    scale_x_continuous(limits = c(1990,2016))+
+    scale_y_continuous(limits = c(-4,4), position = "right") +
+    scale_fill_manual(values = c("neg" = "#C51C8C", "pos"="#1A944B")) +
+    guides(fill = FALSE) +
+    labs(title = group) +
+    theme_void()+
+    theme(
+          plot.title = element_text(family = "oswald", size = 14, hjust = 0.5),
+          )
+}
+
+grade_diff_graph <- lapply(group, plot_diff, hbcu_students)
+
+
+# values for first and last year for each group
+min <- hbcu_students %>%
+  group_by(group) %>%
+  arrange(year) %>%
+  filter(!is.na(perc)) %>%
+  filter(row_number()==1) %>%
+  select(group, min = total) %>%
+  mutate(min = percent(min/100))
+
+max <- hbcu_students %>%
+  group_by(group) %>%
+  arrange(year) %>%
+  filter(!is.na(perc)) %>%
+  filter(row_number()==n()) %>%
+  select(group, max = total) %>%
+  mutate(max = percent(max/100))
+
+# Position of the graphs and labels
+angle <- seq(2*pi/7, 2*pi, 2*pi/7)
+x <- sin(angle)
+y <- cos(angle)
+# manual adjustement
+off_x <-c(0.42,0.4,0.42,0.38,0.40,0.38,0.40)
+off_y <-c(0.38,0.38,0.38,0.37,0.38,0.38,0.40)
+
+position <- tibble(group=group, x=x, y=y, off_x = off_x, off_y = off_y)
+
+position <- position %>%
+  left_join(min, by = c("group")) %>%
+  left_join(max, by = c("group"))
+
+# Position of the point and lines of the wheels
+angle <- seq(2*pi/14, 2*pi, 2*pi/7)
+x <- sin(angle)
+y <- cos(angle)
+
+point <- tibble(group=group, x=x, y=y)
+
+point <- point %>%
+  left_join(min, by = c("group")) %>%
+  left_join(max, by = c("group"))
+
+```
+
+```{r plot}
+
+wheel_clr <- "#85C3D4"
+bck_clr <- "#F2F2F2"
+
+# Main plot and wheel
+main_plot <- ggplot() +
+  geom_segment(aes(x = x*7, y = y*7, xend = x*23, yend = y*23), size = 3, color = wheel_clr) +  
+  geom_circle(aes(x0=0,y0=0,r=7), size = 5, color = wheel_clr) +
+  geom_circle(aes(x0=0,y0=0,r=23), size = 5, color = wheel_clr) +
+  geom_point(data = point, aes(x =x*7 , y =y*7), size = 10, color = bck_clr) +
+  geom_point(data = point, aes(x =x*7 , y =y*7), size = 8, color = wheel_clr) +
+  geom_text(data = position, aes(x =x*4.8 , y =y*4.8, label = min), size = 5, inherit.aes = FALSE, color = "grey30", fontface = "bold")+
+  geom_text(data = position, aes(x =x*26 , y =y*25, label = max), size = 6, inherit.aes = FALSE, color = "grey30", fontface = "bold")+
+  geom_circle(aes(x0=0,y0=0,r=23), size = 5, color = wheel_clr) +
+  geom_point(data = point, aes(x =x*23, y =y*23), size = 10, color = bck_clr) +
+  geom_point(data = point, aes(x =x*23, y =y*23), size = 8, color = wheel_clr)+
+  scale_x_continuous(limits = c(-26,26))+
+  scale_y_continuous(limits = c(-25,25)) +
+  coord_fixed() +
+  labs(
+       title = "Evolution of graduation in HBCU per race / ethnicity for High School",
+       #title = "Evolution of graduation in HBCU per race / ethnicity for Bachelor",
+       subtitle = "The bars show the difference in percentage per year.
+       Inner circle : percentage of the first year,\nOuter circle : percentage of the last year.",
+       caption = "Visualization: Christophe Nicault | Data: Data.World")+
+  theme_void() +
+  theme(plot.background = element_rect(fill = bck_clr, color = NA),
+        plot.title = element_text(family = "oswald", size = 20, hjust = 0.5, margin = margin(15,0,0,0)),
+        plot.subtitle = element_text(family = "roboto", size = 15, hjust = 0.5, margin = margin(15,0,0,0)),
+        plot.caption = element_text(family = "techmono", size = 12, color = "grey30", margin = margin(0,0,10,0), hjust = 0.95))
+
+# generate all the plot of grades variation with their positions
+graduation_plt <- lapply(seq_along(grade_diff_graph), function(i) draw_plot(grade_diff_graph[[i]], x = position$x[[i]]/4+off_x[[i]], y = position$y[[i]]/4+off_y[[i]] , width = 0.2, height = 0.16))
+
+# create a legend to have the scale for each subplot only once
+scale_legende <- ggplot() +
+  scale_y_continuous(limits = c(-4,4), position = "right") +
+  theme_void() +
+  labs(title = "Scale") +
+  theme(axis.ticks.y = element_line(),
+        axis.ticks.length = unit(4, "pt"),
+        plot.title = element_text(size = 12, hjust = 0.5, margin = margin(0,0,6,0)),
+        axis.text.y = element_text(size = 8, hjust = 1, margin = margin(0,0,0,8)),
+        axis.line.y = element_line())
+
+# Final plot
+final <- ggdraw(main_plot) + 
+  graduation_plt + 
+  draw_plot(scale_legende, x = 0.88, y = 0.08, width = 0.05, height = 0.16)
+
+# Save
+
+ragg::agg_png(here::here("render", paste0("hcbu", format(Sys.time(), "_%Y%m%d_%H%M%S"), ".png")), res = 320, width = 11, height = 12, units = "in")
+final
+dev.off()
+
+```
+

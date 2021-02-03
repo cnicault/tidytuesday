@@ -1,5 +1,12 @@
 # Tidy Tuesday data visualisation
 
+## 2021 week 06 - Plastic Pollution
+
+Evolution of graduation in HBCU for each race / ethnicity
+
+![evolution of grade for high school](/2021/2021-06-hbcu-enrollment/hcbu_graduation_highschool.png)
+
+----
 
 ## 2021 week 05 - Plastic Pollution
 
