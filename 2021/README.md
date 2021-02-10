@@ -1,5 +1,14 @@
 # Tidy Tuesday data visualisation
 
+
+## 2021 week 07 - Wealth & income inequality
+
+Wealth and income inequality by race / ethnicity
+
+![Wealth and income inequality](/2021/2021-07-wealth-inequality/wealth_inequality.png)
+
+----
+
 ## 2021 week 06 - HBCU Enrollment
 
 Evolution of graduation in HBCU for each race / ethnicity

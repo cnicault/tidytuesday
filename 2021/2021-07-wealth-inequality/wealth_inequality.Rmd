@@ -1,0 +1,232 @@
+---
+title: "Wealth & Income Inequality"
+author: "Christophe Nicault"
+date: "10/02/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r load_packages}
+
+library(tidytuesdayR)
+library(tidyverse)
+library(cowplot)
+library(ggforce)
+library(scales)
+library(ggtext)
+library(showtext)
+library(glue)
+
+
+font_add_google("Roboto", "roboto")
+font_add_google("Oswald", "oswald")
+font_add_google("Heebo", "heebo")
+font_add_google("Share Tech Mono", "techmono")
+
+showtext_opts(dpi = 320)
+showtext_auto(enable = TRUE)
+
+```
+
+```{r load_data}
+
+tuesdata <- tidytuesdayR::tt_load(2021, week = 7)
+tidytuesdayR::readme(tuesdata)
+
+```
+
+```{r parameters}
+
+bck_color <- "#E8E8E8"
+color_light <- "#E8E8E8"
+color_dark <- "#D9D9D9"
+color_font <- "#9C9C9C"
+color_title <- "#737373"
+
+palette_discrete <- c("Black" = "#0E4473", "Hispanic" = "#BF1E17", "White" = "#6C7308")
+
+theme_set(theme_void(base_family = "Roboto"))
+
+theme_update(axis.title.x = element_text(color = "grey30", size = 12, margin = margin(15,0,0,0)),
+             axis.text.x = element_text(color = "grey30", size = 12, margin = margin(10,0,0,0)),
+             axis.ticks.x = element_line(),
+             axis.title.y = element_blank(),
+             axis.text.y = element_text(color = "grey30", size = 12, hjust = 1),
+             axis.ticks.y = element_line()
+             )
+
+```
+
+
+```{r family_wealth}
+
+family_stat <- tuesdata$race_wealth %>%
+  filter(type == "Median", year == max(year), !is.na(wealth_family)) %>%
+  mutate(wealth_perc = wealth_family / min(wealth_family),
+         position = case_when(
+           race == "Black" ~ wealth_family - 6000,
+           race == "Hispanic" ~ wealth_family + 10000,
+           TRUE ~ wealth_family
+         ))
+  
+
+family <- tuesdata$race_wealth %>%
+  filter(type == "Median", race != "Non-White") %>%
+  ggplot(aes(year, wealth_family, color = race)) +
+  geom_line() +
+  geom_point() +
+  geom_text(data = family_stat, aes(x= year + 1, y = position, label = scales::dollar(wealth_family), color = race), hjust = 0, size = 5, inherit.aes = FALSE) +
+  geom_text(data = family_stat, aes(x= year + 10, y = position, label = scales::percent(wealth_perc), color = race), hjust = 0, size = 5, inherit.aes = FALSE) +  
+  scale_y_continuous(labels = scales::dollar_format()) +
+  scale_x_continuous(limits = c(1980,2030), breaks = seq(1980, 2020, 10)) +
+  scale_color_manual(values = palette_discrete) +
+  guides(color=FALSE)+
+  theme(panel.grid.major.y = element_line(linetype = "14", size = 0.3, color = "grey20"),
+        axis.title.x = element_blank())
+
+```
+
+
+
+```{r student_debt}
+
+student_stat <- tuesdata$student_debt %>%
+  filter(year == max(year)) %>%
+  mutate(loan_perc = loan_debt / min(loan_debt))
+
+
+student_debt <- tuesdata$student_debt %>%
+  pivot_longer(cols = starts_with("loan"), names_to = "loan", values_to = "value") %>%
+  mutate(loan = case_when(
+    loan == "loan_debt"  ~ "Amount",
+    loan == "loan_debt_pct"  ~ "Percentage"
+  )) %>%
+  filter(loan == "Amount") %>%
+  ggplot(aes(year, value, color = race)) +
+  geom_line(size = 1) +
+  geom_point(size = 2) +
+  geom_text(data = student_stat, aes(x= year + 1, y = loan_debt, label = scales::dollar(loan_debt, accuracy = 1), color = race), hjust = 0, size = 5, inherit.aes = FALSE) +
+  geom_text(data = student_stat, aes(x= year + 10, y = loan_debt, label = scales::percent(loan_perc), color = race), size = 5, hjust = 0, inherit.aes = FALSE) +    
+  scale_y_continuous(breaks = c(0, 5000, 10000, 15000), labels = scales::dollar_format(), expand = c(0.2,0)) +
+  scale_x_continuous(limits = c(1980,2030), breaks = seq(1980, 2020, 10)) +
+  scale_color_manual(values = palette_discrete) +
+  guides(color = FALSE) +
+  theme(panel.grid.major.y = element_line(linetype = "14", size = 0.3, color = "grey20"),
+        axis.title.x = element_blank(),
+        axis.text.x = element_text(color = "grey30", size = 12, margin = margin(0,0,0,0)),)
+
+```
+
+
+```{r income_distribution}
+
+order <- unique(tuesdata$income_distribution$income_bracket)
+
+
+distrib <- tuesdata$income_distribution %>%
+  group_by(race) %>%
+  filter(year == 1972 | year == max(year)) %>%
+  ungroup() %>%
+  mutate(income_bracket = fct_relevel(income_bracket, order),
+         year = paste0("year_", year)) %>%
+  filter(race %in% c("Black Alone", "White Alone", "Hispanic (Any Race)")) %>%
+  mutate(race = word(race)) %>%
+  pivot_wider(id_cols = c("race", "income_bracket"), names_from = "year", values_from = "income_distribution") %>%
+  mutate(trend = ifelse(year_2019 < year_1972, "neg", "pos"),
+         bracket_num = as.numeric(as.factor(income_bracket)),
+         bracket_lab = as.factor(income_bracket),
+         offset = case_when(
+           race == "Black" ~ -0.2,
+           race == "White" ~ 0.2,
+           TRUE ~ 0
+         ))
+
+bracket_y <- distrib$bracket_num
+labels <- distrib$bracket_lab
+  
+income_dist <- distrib %>%
+  ggplot() +
+  geom_point(aes(year_2019, bracket_num + offset, color = race), size = 3) +
+  geom_segment(aes(x = year_2019, xend = year_1972, y = bracket_num + offset, yend = bracket_num + offset, color = race), size = 1.5, alpha = 0.5) +
+  scale_y_continuous(breaks = bracket_y, labels = labels) +
+  scale_x_continuous(labels = scales::percent_format(accuracy = 1, scale = 1)) +
+  scale_color_manual(values = palette_discrete) +
+  labs(x = "Percent of each racial group per income range from 1972 to 2019 (dot)") +
+  guides(color = FALSE) +
+  theme(panel.grid.major.x = element_line(linetype = "14", size = 0.3, color = "grey20"))
+
+```
+
+```{r retirement}
+
+retirement <- tuesdata$retirement %>%
+  filter(year == max(year)) %>%
+  mutate(perc = retirement / min(retirement),
+         radius = 10 * sqrt(retirement / min(retirement))) %>%
+  arrange(radius) %>%
+  mutate(lag = ifelse(!is.na(lag(radius)), lag(radius), 0),
+         offset = sqrt((radius + lag)^2 - (radius - lag)^2),
+         position = cumsum(offset)) %>%  
+  ggplot() +
+  geom_circle(aes(x0 =position, y0 = radius, r = radius, fill = race), color = NA) +
+  geom_text(aes(x = position, y = radius, label = paste(round(perc,2), "X")), family = "oswald", color = "white", size = 5, fontface = "bold") +
+  scale_fill_manual(values = palette_discrete) +
+  coord_fixed() +
+  labs(fill = "Race / Ethnicity") +
+  guides(fill = guide_legend(title.position = "top",
+                               label.position = "right",
+                               title.hjust = 0.5,
+                               keywidth = unit(2, "line"),
+                               keyheight = unit(2, "line")
+                               )
+         ) +
+  theme_void()  +
+  theme(legend.position = c(1.6, 0.5),
+        legend.direction = "vertical",
+        legend.title = element_text(family = "roboto", size = 16, color = color_title, face = "bold"),
+        legend.text = element_text(family = "roboto", size = 14, color = color_title, face = "bold"),
+        legend.spacing.x = unit(1, 'line'),
+        legend.spacing.y = unit(1, 'line'),
+        legend.key.size = unit(1.5, 'lines')
+        )
+
+```
+
+
+```{r final_plot}
+
+main_plt <- ggplot() +
+  scale_x_continuous(limits = c(0,175), expand = c(0,0))+
+  scale_y_continuous(limits = c(0,220), expand = c(0,0))+
+  annotate("text",x = 8, y = 195, label= "FROM FAMILY\nWEALTH", angle = 90, family = "oswald", size = 10, hjust = 0.5, vjust = 0.7, color = color_font) +
+  annotate("rect", xmin = 0, ymin = 115, xmax = 175, ymax = 167, fill = color_dark) +
+  annotate("text",x = 8, y = 142, label= "THROUGH STUDIES\nLOAN DEBT", angle = 90, family = "oswald", size = 10, hjust = 0.5, vjust = 0.7, color = color_font) +
+  annotate("text",x = 8, y = 85, label= "THROUGHOUT LIFE\nINCOME", angle = 90, family = "oswald", size = 10, hjust = 0.5, vjust = 0.7, color = color_font) +
+  annotate("rect", xmin = 0, ymin = 0, xmax = 175, ymax = 45, fill = color_dark) +    
+  annotate("text",x = 8, y = 23, label= "TO RETIREMENT\nSAVINGS", angle = 90, family = "oswald", size = 10, hjust = 0.5, vjust = 0.7, color = color_font) +
+  coord_fixed() +
+  labs(title = "Wealth & income inequality in the USA",
+       subtitle = glue("between <span style='color:{palette_discrete[\"Black\"]}'>Black</span>, <span style='color:{palette_discrete[\"Hispanic\"]}'>Hispanic</span> and <span style='color:{palette_discrete[\"White\"]}'>White</span>")) +
+  theme_void() +
+  theme(plot.background = element_rect(fill = bck_color, color = NA),
+        plot.title = element_text(family = "oswald", color = color_title, face = "bold", size = 28, hjust = 0.5, margin = margin(15,0,15,0)),
+        plot.subtitle = element_textbox(family ="roboto", color = color_title, size = 20, hjust = 0.5, margin = margin(0,0,15,0)))
+
+
+final <- ggdraw(main_plt) + 
+  draw_plot(family, x = 0.2, y = 0.72, width = 0.74, height = 0.16) +
+  draw_plot(student_debt, x = 0.2, y = 0.50, width = 0.74, height = 0.18) +
+  draw_plot(income_dist, x = 0.2, y = 0.21, width = 0.74, height = 0.25) +
+  draw_plot(retirement, x = 0.1, y = 0.025, width = 0.74, height = 0.15) +
+  draw_text(x = 0.95, y = 0.01, text = "Visualization: Christophe Nicault | Data: Urban Institute & US Census", family = "techmono", size = 12, color = "grey30", hjust = 1)
+
+ragg::agg_png(here::here("render", paste("inequality", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")), res = 320, width = 11, height = 15, units = "in")
+final
+dev.off()
+
+```
