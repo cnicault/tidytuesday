@@ -1,5 +1,14 @@
 # Tidy Tuesday data visualisation
 
+## 2021 week 08 - Du Bois Challenge
+
+The goal is to recreate Du Bois Vizualisation :
+Who is W.E.B. Du Bois?
+Overall, W.E.B. Du Bois was a true data visualization expert and visionary who sought with data and data visualization to challenge the incorrect thinking and racist views prevalent in the early 20th century, all only a few decades after the freeing of American slaves.
+
+![Occupations in Georgia](/2021/2021-08-Dubois-challenge/dubois_challenge_03.png)
+
+----
 
 ## 2021 week 07 - Wealth & income inequality
 

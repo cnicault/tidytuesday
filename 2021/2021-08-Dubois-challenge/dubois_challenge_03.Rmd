@@ -1,0 +1,126 @@
+---
+title: "Dubois challenge 03"
+author: "Christophe Nicault"
+date: "16/02/2021"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(tidytuesdayR)
+library(tidyverse)
+library(ggforce)
+library(showtext)
+library(glue)
+library(cowplot)
+
+font_add_google("Rajdhani", "rajdhani")
+font_add_google("Changa", "changa")
+
+showtext_opts(dpi = 320)
+showtext_auto(enable = TRUE)
+```
+
+
+```{r load_data}
+tuesdata <- tidytuesdayR::tt_load(2021, week = 8)
+```
+
+```{r data_preparation}
+
+# add empty space between each group (note : the pourcentage has to be above the max value (64), otherwize the order in the colors df won't work, and need to order the factor manually)
+blank <- tibble(Group = c("Negroes", "Whites"), Occupation = rep("blank",2), Percentage = rep(65,2))
+
+# Order the colors according to Dubois and keep it for the two groups
+colors <- tuesdata$occupation %>%
+  bind_rows(blank) %>%
+  filter(Group == "Negroes") %>%  
+  mutate(Occupation = fct_reorder(Occupation, Percentage, .desc = TRUE),
+         Color = as.character(as.numeric(Occupation))) %>%
+  select(Occupation, Color)
+
+# Format text to avoid rewriting manually with the line break
+format_text <- function(Occupation){
+
+  ifelse(length(strsplit(as.character(Occupation), " ")[[1]]) <= 2,
+           glue("{Occupation}."),
+           glue("{word(Occupation,1,2)}\n{word(Occupation, 3, length(strsplit(as.character(Occupation), ' ')[[1]]))}.")
+         )
+}
+
+# Coordinate for the legend
+coord <- tibble(x = c(-48, -48, 48, 48, 48),
+               y = c(7.5, -7.5, 15, 0, -14))
+
+# Legend with coordinate and text formated
+legend_format <- colors %>%
+  filter(Color != "1") %>%
+  mutate(Occupation = str_to_upper(Occupation),
+         Occupation = map_chr(Occupation, format_text)
+         ) %>%
+  bind_cols(coord)
+
+```
+
+
+```{r plot}
+
+# Palettes 
+dubois_pal <- c("1" = NA, "2" = "#DD263F", "3" = "#FFC500", "4" = "#7889B3", "5" = "#E2D4C1", "6" = "#B39B88")
+dubois_col <- c("1" = NA, "2" = "#C0B5A5", "3" = "#C0B5A5", "4" = "#C0B5A5", "5" = "#C0B5A5", "6" = "#C0B5A5")
+
+# background & title
+main <- ggplot() +
+  labs(title = "OCCUPATIONS OF NEGROES AND WHITES IN GEORGIA.") +
+  theme(plot.background = element_rect(fill = "#E4D7C8", color = NA),
+        panel.background = element_blank(),
+        plot.title = element_text(family = "changa", size = 22, hjust = 0.5, margin = margin(15,0,0,0)))
+
+# pie chart
+chart <- tuesdata$occupation %>%
+  bind_rows(blank) %>% 
+  left_join(colors) %>%
+  arrange(desc(Group), Color) %>%
+  mutate(ypos = cumsum(Percentage) - 0.5 * Percentage,
+         label = scales::percent(Percentage, scale = 1, accuracy = 1),
+         label = ifelse(Color == "1", NA, label)) %>%
+  ggplot(aes(x=0, Percentage)) +
+  geom_bar(aes(color = Color, fill = Color, group = Group), stat = "identity") +
+  geom_text(aes(y = ypos, label = label), nudge_x = 0.35, family = "rajdhani", size = 4)+
+  annotate("text", x = 0.5 , y = 278, label = "NEGROES.", family = "rajdhani", size = 5)+
+  annotate("text", x = 0.5 , y = 115, label = "WHITES.", family = "rajdhani", size = 5)+
+  scale_fill_manual(values = dubois_pal) +
+  scale_color_manual(values = dubois_col) +
+  guides(fill = FALSE, color = FALSE) +
+  coord_polar("y", start = pi/3.2) +
+  theme_void()
+
+# legend
+legend_plt <- legend_format %>%
+  ggplot() +
+  geom_circle(aes(x0 = x, y0 = y, r = 3, fill = Color), color = "#BFB7A6") +
+  geom_text(data = head(legend_format,2),aes(x = x + 5, y = y, label = Occupation), hjust = 0, family = "rajdhani", size = 3.5) +
+  geom_text(data = tail(legend_format,3),aes(x = x - 5, y = y, label = Occupation), hjust = 1, family = "rajdhani", size = 3.5) +
+  scale_fill_manual(values = dubois_pal) +
+  scale_x_continuous(limits = c(-55,55))+
+  coord_fixed() +
+  guides(fill = FALSE) +
+  theme_void()
+
+# assemble
+final <- ggdraw(main) + 
+  draw_plot(chart, x = -0.1, y = -0.1, width = 1.2, height = 1.2) +
+  draw_plot(legend_plt, x = 0, y = 0.35, width = 1, height = 0.3)+
+  draw_text(x = 0.95, y = 0.01, text = "Visualization: Christophe Nicault | Data: W.E.B. Du Bois Challenge for #duboischallenge", family = "rajdhani", size = 10, color = "grey30", hjust = 1)
+
+ragg::agg_png(here::here("render", paste("dubois3", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")), res = 320, width = 8.25, height = 10.6, units = "in")
+final
+dev.off()
+
+```
+
