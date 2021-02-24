@@ -116,7 +116,7 @@ legend_plt <- legend_format %>%
 final <- ggdraw(main) + 
   draw_plot(chart, x = -0.1, y = -0.1, width = 1.2, height = 1.2) +
   draw_plot(legend_plt, x = 0, y = 0.35, width = 1, height = 0.3)+
-  draw_text(x = 0.95, y = 0.01, text = "Visualization: Christophe Nicault | Data: W.E.B. Du Bois Challenge for #duboischallenge", family = "rajdhani", size = 10, color = "grey30", hjust = 1)
+  draw_text(x = 0.95, y = 0.01, text = "Visualization: Christophe Nicault | Data: W.E.B. Du Bois Challenge for #DuBoisChallenge", family = "rajdhani", size = 10, color = "grey30", hjust = 1)
 
 ragg::agg_png(here::here("render", paste("dubois3", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")), res = 320, width = 8.25, height = 10.6, units = "in")
 final

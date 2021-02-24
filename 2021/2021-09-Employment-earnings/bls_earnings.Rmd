@@ -1,0 +1,244 @@
+---
+title: "Employment and Earnings"
+author: "Christophe Nicault"
+date: "24/02/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load_packages}
+
+library(tidytuesdayR)
+library(tidyverse)
+library(lubridate)
+library(patchwork)
+library(showtext)
+library(scales)
+library(glue)
+
+font_add_google("Oswald", "oswald")
+font_add_google("Roboto", "roboto")
+font_add_google("Roboto Condensed", "roboto condensed")
+font_add_google("Share Tech Mono", "techmono")
+
+showtext_opts(dpi = 320)
+showtext_auto(enable = TRUE)
+
+theme_set(theme_void(base_family = "roboto condensed"))
+
+```
+
+```{r load_data}
+
+tuesdata <- tidytuesdayR::tt_load(2021, week = 9)
+tidytuesdayR::readme(tuesdata)
+
+```
+
+
+```{r data_preperation}
+
+earning_ts <- tuesdata$earn %>%
+  filter(race != "All Races", race != "Asian", age == "25 years and over", sex != "Both Sexes") %>%
+  mutate(date = yq(glue::glue("{year}:Q{quarter}"))) %>%
+  mutate(category = glue("{race} - {sex}"))
+
+gap_data <- tuesdata$earn %>%
+  filter(race != "All Races", race != "Asian", age == "25 years and over", sex != "Both Sexes") %>%
+  mutate(date = yq(glue::glue("{year}:Q{quarter}"))) %>%
+    filter(year == 2020) %>%
+  group_by(race, sex) %>%
+  summarise(earning = mean(median_weekly_earn)) %>%
+  ungroup()
+
+race_gap <- gap_data %>%
+  pivot_wider(id_cols = -c(race), names_from = "race", values_from = "earning") %>% 
+  mutate(race_gap = White - `Black or African American`,
+         perc_gap = `Black or African American` / White)
+
+gender_gap <- gap_data %>%
+  pivot_wider(id_cols = -c(sex), names_from = "sex", values_from = "earning") %>% 
+  mutate(gender_gap = Men - Women,
+         gender_perc_gap = Women / Men)
+
+
+sum_data <- tuesdata$earn %>%
+  filter(race != "All Races", race != "Asian", age == "25 years and over", sex != "Both Sexes") %>%
+  mutate(date = yq(glue::glue("{year}:Q{quarter}"))) %>%
+    filter(year == 2020) %>%
+  group_by(race, sex) %>%
+  summarise(earning = mean(median_weekly_earn)) %>%
+  ungroup()
+
+```
+
+
+```{r theme_colors}
+
+chart_theme <- theme(panel.background = element_blank(),
+        panel.grid.major.y = element_line(linetype = "14", size = 0.3, color = "grey20"),
+        plot.title = element_text(family = "oswald", size = 14, margin = margin(5,0,10,0), color = "grey40", hjust = -0.05),
+        strip.background = element_blank(),
+        strip.text.x = element_text(hjust = 0.5, size = 12),
+        axis.title.x = element_blank(),
+        axis.title.y = element_text(size = 14, angle = 90, margin = margin(0,5,5,0)),
+        axis.text = element_text(size = 10, margin = margin(5,0,0,0)),
+        axis.line.x = element_line(linetype = "12", size = 0.3, color = "grey20"))
+
+pal1 <- c("#2493BF", "#8ABF17", "#F2B035", "#8C4E03")
+
+```
+
+```{r line_charts}
+
+labels <- earning_ts %>%
+  arrange(sex, race) %>%
+  distinct(sex, race, category) %>%
+  bind_cols(tibble(x = c(rep(yq("2015-Q1"),4)), y1 = c(625, 1050,550, 850), y3 = c(850, 1050,550, 700)))
+
+racial_inequality <- earning_ts %>%
+  ggplot(aes(date, median_weekly_earn, color = category)) +
+  geom_line() +
+  geom_text(data = labels, aes(x, y = y1, label = category, color = category), size = 3) +
+  scale_y_continuous(limits = c(400, 1200),
+                     expand = c(0.1, 0.1),
+                     labels = dollar,
+                     breaks = c(400,600,800,1000,1200)) +
+  scale_color_manual(values = pal1) +
+  facet_wrap(~sex) +
+  guides(color = FALSE) +
+  labs(title = "Racial earnings inequality for each gender",
+       y = "Weekly earnings") + 
+  chart_theme +
+  theme(plot.margin = margin(0,0,5,0),
+        panel.spacing.x = unit(3, "lines"))
+
+
+gender_inequality <- earning_ts %>%
+  ggplot(aes(date, median_weekly_earn, color = category)) +
+  geom_line() +
+  geom_text(data = labels, aes(x, y = y3, label = category, color = category), size = 3) +
+  scale_y_continuous(limits = c(400, 1200), 
+                     expand = c(0.1, 0.1),
+                     labels = dollar, 
+                     breaks = c(400,600,800,1000,1200)) +
+  scale_color_manual(values = pal1) +
+  facet_wrap(~race) +
+  guides(color = FALSE) +
+  labs(title = "Gender earnings inequality for each race",
+       y = "Weekly earnings") +
+  chart_theme +
+  theme(plot.margin = margin(5,0,0,0),
+        panel.spacing.x = unit(3, "lines"))
+
+```
+
+```{r main_plot}
+
+text <- sum_data %>%
+  bind_cols(tibble(x = c(3.5, 9.5, -1, 5.4), y = c(0,0,1,1))) %>%
+  mutate(color = glue("{race} - {sex}"))
+
+bal <- tibble(x = c(-1, 1, 3, 5), y = c(1,1,0,0))
+
+
+axis <- tibble(x = c(-2.2, -2, 1, 7), 
+               xend = c(6, 10, 0, 6),
+               y = c(1, 0, 1, 1),
+               yend =c(1, 0, 1.5, 1.5))
+
+percentage <- tibble(x = c(1.3, 8.5, 3, 7),
+                     y = c(0.5, 0.6, 1.1, 0.1),
+                     label = c(
+                       race_gap$perc_gap[[1]],
+                       race_gap$perc_gap[[2]],
+                       gender_gap$gender_perc_gap[[2]],
+                       gender_gap$gender_perc_gap[[1]]
+                     )) %>%
+  mutate(label = percent(label - 1, accuracy = 0.1))
+
+axis_text <- tibble(x = c(0.7, 6.7, -1.5, 0, 12.4, 7),
+                    y = c(1.3, 1.3, 1.1, 0.2, 0.5, -0.35),
+                    label = c("Men", "Women", "White", "Black or\nAfrican American", "Racial inequality", "Gender inequality"),
+                    angle = c(-50, -50, 0, 0, 90, 0),
+                    hjust = c(0.5, 0.5, 1, 1, 0.5, 0.5))
+
+arrows <- tibble(x = c(12, 5),
+                 xend = c(12, 9),
+                 y = c(1, -0.5),
+                 yend = c(0, -0.5))
+
+main_plot <- ggplot()+
+  geom_segment(data= axis, aes(x = x, y = y , xend = xend, yend = yend), linetype = "13", size = 0.5, color = "grey40")+
+  geom_path(data = bal, aes(x, y), size = 2, color = "grey40") +
+  geom_path(data = bal, aes(x + 6, y), size = 2, color = "grey40") +
+  geom_text(data = text, aes(x, y, label = dollar(earning), color = color),
+            nudge_y = 0.15, 
+            hjust = 0,
+            fontface = "bold",
+            size = 4) +
+  geom_text(data = percentage, aes(x, y, label = label), fontface = "bold", size = 4)+
+  geom_text(data = axis_text, aes(x, y, label = label, angle = angle, hjust = hjust), size = 4, color = "grey40")+
+  geom_segment(data = arrows, aes(x = x, y = y, xend = xend, yend = yend),
+               arrow = arrow(length = unit(0.1, "inches"), ends = "last"),
+               size = 1,
+               color = "grey40")+
+  geom_tile(data = text, aes(x=0, y=0, width = 0, height = 0, fill = color, color = color), size=1) +
+  scale_x_continuous(limits= c(-2.5,13)) +
+  scale_y_continuous(limits= c(-1.5,1.8)) +
+  scale_color_manual(values = pal1) +
+  scale_fill_manual(values = pal1) +
+  labs(tag = "The amounts are the \naverage of weekly \nearnings for 2020.") +
+  guides(fill = guide_legend(title.hjust = 0.5,
+                             nrow = 2
+                             ),
+         color  = FALSE) +
+  theme(plot.tag.position = c(0.8, 0.12),
+        plot.tag = element_text(size = 11, hjust = 0, vjust = 0),
+        legend.position = c(0.3, 0.12),
+        legend.direction = "horizontal",
+        legend.title = element_blank(),
+        legend.text = element_text(size = 10),
+        panel.spacing = margin(5,5,5,5),
+        plot.background = element_rect(fill = "#F7F7F7", color = NA))
+
+final <- racial_inequality / main_plot / gender_inequality +
+    plot_layout(nrow = 3, heights = c(1,2.2,1)) +
+    plot_annotation(
+      title = "Racial and gender earnings inequality",
+      subtitle = "25 years and over",
+      caption = "Visualization: Christophe Nicault | Data: US Bureau of Labor Statistics",
+      theme = theme(
+        plot.title = element_text(family = "oswald", size = 18, hjust = 0.5, margin = margin(10,0,0,0)),
+        plot.subtitle = element_text(family = "roboto", size = 10, hjust = 0.5, margin = margin(5,0,0,0), lineheight = 1.1),
+        plot.caption = element_text(family = "techmono", size = 10, color = "grey30", margin = margin(20,0,0,0))      
+      )
+    )
+
+ragg::agg_png(here::here("render", paste0("bls_earnings_full", "_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")), res = 320, width = 10, height = 10, units = "in")
+
+final
+
+dev.off()
+
+```
+
+```{r}
+ragg::agg_png(here::here("render", paste0("bls_earnings_single", "_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")), res = 320, width = 10, height = 6, units = "in")
+
+main_plot +
+  labs(title = "Racial and gender earnings inequality",
+       subtitle = "25 years and over",
+       caption = "Visualization: Christophe Nicault | Data: US Bureau of Labor Statistics") +
+  theme(
+        plot.title = element_text(family = "oswald", size = 18, hjust = 0.5, margin = margin(10,0,0,0)),
+        plot.subtitle = element_text(family = "roboto", size = 14, hjust = 0.5, margin = margin(5,0,0,0), lineheight = 1.1),
+        plot.caption = element_text(family = "techmono", size = 10, color = "grey30", margin = margin(20,0,5,0), hjust = 0.98)      
+      )
+
+dev.off()
+```
+

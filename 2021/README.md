@@ -1,5 +1,12 @@
 # Tidy Tuesday data visualisation
 
+## 2021 week 09 - Employment and Earnings
+
+Racial and gender earnings inequality
+
+![Earnings inequality](/2021/2021-09-Employment-earnings/bls_earnings_single.png){width=48%}![Earnings inequality](/2021/2021-09-Employment-earnings/bls_earnings_full.png){width=48%}
+
+----
 ## 2021 week 08 - Du Bois Challenge
 
 The goal is to recreate Du Bois Vizualisation :
