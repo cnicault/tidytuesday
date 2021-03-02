@@ -1,0 +1,167 @@
+---
+title: "Superbowl_commercials"
+author: "Christophe Nicault"
+date: "02/03/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(tidytuesdayR)
+library(tidyverse)
+library(scales)
+library(ggtext)
+library(cowplot)
+library(ggimage)
+library(showtext)
+
+font_add_google("Oswald", "oswald")
+font_add_google("Roboto", "roboto")
+font_add_google("Roboto Condensed", "roboto condensed")
+font_add_google("Share Tech Mono", "techmono")
+
+showtext_opts(dpi = 320)
+showtext_auto(enable = TRUE)
+```
+
+```{r}
+tuesdata <- tidytuesdayR::tt_load(2021, week = 10)
+tidytuesdayR::readme(tuesdata)
+```
+
+```{r}
+youtube <-tuesdata$youtube
+
+```
+
+```{r}
+# space for the facet, use only for brand_perc
+
+spacer <- tibble(brand = c("a","b"),
+       like_perc = c(0.0047,0.0045),
+       dislike_perc = c(0,0),
+       comment_perc = c(0,0))
+
+# percentage of likes -> need the spacer to relevel the second df
+brand_perc <- youtube %>%
+  select(brand, contains("count"), is.logical) %>%
+  na.omit() %>%
+  group_by(brand) %>%
+  summarise(like_perc = mean(like_count) / mean(view_count),
+         dislike_perc = mean(dislike_count) / mean(view_count),
+         comment_perc = mean(comment_count) / mean(view_count)) %>%
+  ungroup() %>%
+  bind_rows(spacer) %>%
+  mutate(brand = fct_reorder(brand, desc(like_perc)))
+
+# space for the facet, use only for brand_features
+spacer <- tibble(brand = c("a","b"),
+       feature_name = c("funny","funny"),
+       feature = c(0,0))
+
+# top features per brand
+brand_features <- youtube %>%
+  select(brand, contains("count"), is.logical) %>%
+  na.omit() %>%
+  group_by(brand) %>%
+  summarise(across(is.logical, mean)) %>%
+  ungroup() %>%
+  pivot_longer(cols = is.numeric, values_to = "feature", names_to = "feature_name") %>%
+  group_by(brand) %>%
+  bind_rows(spacer) %>%  
+  arrange(brand, desc(feature)) %>%
+  mutate(feat_rank = ifelse(row_number() <= 3, "Top 3", "Others")) %>%
+  ungroup() %>%
+  mutate(brand = fct_relevel(brand, levels(brand_perc$brand)))
+
+# Add images for content type plot
+brand_features <- brand_features %>%
+  mutate(file = tolower(str_remove(brand, "[ -]")),
+         path = glue::glue("{here::here('2021', '2021-10-Superbowl-commercials', 'logo')}/{file}.png"))
+
+# create a label with pictures for image on the axis of the "likes" plot
+filename <- tolower(str_remove(unique(youtube$brand), "[ -]"))
+img <- sapply(filename, function(x) glue::glue("<img src='{here::here('2021', '2021-10-Superbowl-commercials', 'logo')}/{x}.png' width='43' />"))
+labels <- setNames(img, unique(youtube$brand))
+
+# create legend text and positions
+legend <- brand_features %>%
+  filter(brand == "Bud Light") %>%
+  select(2:3) %>%
+  mutate(
+         feature_name = str_to_title(str_replace_all(feature_name, "_", " ")),
+         feature_name = str_to_title(str_replace_all(feature_name, " Q", "\nQ")),
+         feature_name = str_to_title(str_replace_all(feature_name, " P", "\nP")))
+
+legend$feature <- rep(0.8, 7)
+legend$angle <- c(0, 80, 45, 25, -25, -80, -50)
+
+```
+
+
+```{r}
+pal1 <- c("Top 3" = "#003A74", "Others" = "#7E7E7E")
+
+features_plt <- ggplot()+
+  geom_col(data = brand_features, aes(x = feature_name, y = feature,fill = feat_rank), width = 1) +
+  geom_image(data = brand_features, aes(x= 3, y = -1, image = path), size = 0.27)+
+  scale_y_continuous(limits = c(-1,1), expand = c(0,0)) +
+  scale_x_discrete(expand = c(0,0)) +
+  scale_fill_manual(values = pal1) +
+  coord_polar() +
+  facet_wrap(~brand) +
+  guides(fill = FALSE) +
+  labs(title = "Superbowl Commercials",
+       subtitle = "The bart chart in the middle shows the average percentage of \"likes\" for each brand's commercial.\nCircumference graphs show the percentage of each type of content per brand;\nthe three types of content most used by the brand are highlighted;\nthe content type is given by the position on the legend wheel.",
+       caption = "Visualization: Christophe Nicault | Data: FiveThirtyEight") +
+  theme_void()+
+  theme(strip.background = element_blank(),
+        strip.text = element_blank(),
+        plot.title = element_text(family = "oswald", size = 36, margin = margin(10,0,20,0), hjust = 0.5, color = "#003A74", face = "bold"),
+        plot.subtitle = element_text(family = "roboto", size = 14),
+        plot.caption = element_text(family = "techmono", size = 12, color = "grey30", margin = margin(15,0,0,0)),
+        panel.spacing.x = unit(4, "lines"))
+
+
+likes_plt <- brand_perc %>%
+  filter(!brand %in% c("a", "b")) %>%    # remove the fake branch created to space the facets
+  ggplot(aes(x = brand, y = like_perc)) +
+  geom_col(fill = "#7E7E7E") +
+  geom_text(aes(label = percent(like_perc, accuracy = 0.01)), nudge_y = 0.0005, color = "#003A74", fontface = "bold", size = 5) +
+  scale_y_continuous(labels = percent) +
+  scale_x_discrete(name = NULL, labels = labels) +
+  theme_void() +
+  theme(
+    axis.text.x = element_markdown(color = "black", size = 8, vjust = 0.5)
+  ) 
+
+
+legend_plt <- ggplot()+
+  geom_col(data = legend, aes(x = feature_name, y = feature), color = NA, fill = "#003A74")+
+  geom_text(data = legend, aes(x = feature_name, y = 1, label = feature_name, angle = angle),
+            vjust = 0.3, hjust = 0.5, size = 3.5, lineheight = unit(0.6, "lines"),
+            family = "roboto", fontface = "bold")+
+  scale_y_continuous(limits = c(-0.3,1.2), expand = c(0,0)) +
+  scale_fill_manual(values = pal1) +
+  coord_polar() +
+  scale_x_discrete(expand = c(0.08,0.02)) +
+  guides(fill = FALSE, color = FALSE) +
+  theme_void()
+
+
+final <- ggdraw(features_plt) + 
+  draw_plot(likes_plt, x = 0.3, y = 0.3, width = 0.4, height = 0.3) +
+  draw_plot(legend_plt, x = 0.78, y = 0.78, width = 0.25, height = 0.25) 
+  
+
+ragg::agg_png(here::here("render", paste("superbowl_commercials_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")), res = 320, width = 16, height = 10, units = "in")
+final
+dev.off()
+
+
+```
+
