@@ -70,7 +70,7 @@ bck_clr <- "grey30"
 
 ```{r beeswarm_plot}
 
-text <- "The Bechdel test, invented by Alison Bechdel, allows the evaluation of the female presence in a movie,<br> thanks to three criteria: <br>- the movie has to have at least two women in it,<br>- who talk to each other,<br>- about something else than men.<br>If the movie has <span style='color:#BA415D'>**no women**</span>, or <span style='color:#ED5276'>**they don't talk to each other**</span>, or <span style='color:#F09CB0'>**they talk about men**</span>, it fails the test.<br>The movie is described as <span style='color:#F4CDA5'>**dubious**</span> when it's unclear for the contributor if it should pass the test.<br>We can see that over time more movies <span style='color:#3C989E'>**pass the test**</span>, however, until mid-90's, the number of movies<br> tested was too low to be meaningful.<br>Since then, only about 50% of films pass the test.<br>The categories that are more than 50% successful are Comedy, Drama, and Horror.<br>The categories which do not have enough films are grouped together<br> in a category called \"Less frequent genre\"."
+text <- "The Bechdel test, invented by Alison Bechdel, allows the evaluation of the female presence in a movie,<br> thanks to three criteria: <br>- the movie has to have at least two women in it,<br>- who talk to each other,<br>- about something else than men.<br>If the movie has <span style='color:#BA415D'>**no women**</span>, or <span style='color:#ED5276'>**they don't talk to each other**</span>, or <span style='color:#F09CB0'>**they talk about men**</span>, it fails the test.<br>The movie is described as <span style='color:#F4CDA5'>**dubious**</span> when it's unclear for the contributor if it should pass the test.<br>We can see that over time more movies <span style='color:#3C989E'>**pass the test**</span>, however, until mid-90's, the number of movies<br> tested was too low to be meaningful.<br>Since then, only about 50% of films pass the test.<br>The categories that are more than 50% successful are Comedy, Drama, and Horror.<br>The categories which do not have enough films are grouped together<br> in a category called \"Less common genres\"."
 
 
 bechdel_beeswarm <- bechdel_df %>%
@@ -124,7 +124,7 @@ bechdel_stream <- perc_rating %>%
 
 bechdel_genre <- bechdel_df %>%
   mutate(main_genre = str_remove(word(genre, 1), ","),
-         main_genre = fct_lump_n(main_genre, 7, other_level = "Less frequent\n genre"),
+         main_genre = fct_lump_n(main_genre, 7, other_level = "Less common\n genres"),
          clean_test = as.factor(clean_test),
          binary = str_to_title(binary)) %>%
   filter(!is.na(main_genre)) %>% 
