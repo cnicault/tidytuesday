@@ -1,5 +1,13 @@
 # Tidy Tuesday data visualisation
 
+## 2021 week 12 - Video Games
+
+Video Games Awards
+
+![Video Games Awards](/2021/2021-12-video_games/video_games.png)
+
+----
+
 ## 2021 week 11 - Bechdel Test
 
 Bechdel Test - Women presence in movies

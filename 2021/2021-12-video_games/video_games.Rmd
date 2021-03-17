@@ -1,0 +1,258 @@
+---
+title: "Video Games"
+author: "Christophe Nicault"
+date: "17/03/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r load_packages}
+
+library(tidyverse)
+library(tidytuesdayR)
+library(lubridate)
+library(glue)
+library(patchwork)
+library(ggtext)
+library(showtext)
+
+font_add_google("Roboto", "roboto")
+font_add_google("Roboto Condensed", "roboto condensed")
+font_add_google("Press Start 2P", "start2p")
+font_add_google("Share Tech Mono", "techmono")
+
+showtext_opts(dpi = 320)
+showtext_auto(enable = TRUE)
+
+```
+
+```{r load_data}
+
+tuesdata <- tidytuesdayR::tt_load(2021, week = 12)
+tidytuesdayR::readme(tuesdata)
+
+games <- tuesdata$games
+
+games <- games %>%
+  mutate(month_num = match(month, month.name),
+         end_month = ceiling_date(ymd(glue("{year}-{month_num}-18")), "month") - days(1))
+
+```
+
+
+```{r by_longevity}
+
+games_df <- games %>%
+  group_by(gamename) %>%
+  arrange(end_month) %>%
+  mutate(timeline = row_number()) %>%
+  ungroup()
+
+```
+
+
+```{r all_awards}
+
+streak <- games_df %>%
+  mutate(gain_bin = ifelse(gain < 0 | is.na(gain), 0, 1)) %>%
+  group_by(gamename) %>%
+  arrange(timeline) %>%
+  mutate(lag_gain_bin = lag(gain_bin),
+         start = ifelse(gain_bin != lag_gain_bin, TRUE, FALSE),
+         start = ifelse(is.na(start), TRUE, start),
+         streak_id = cumsum(start)) %>%
+  ungroup() %>%
+  group_by(gamename, streak_id) %>%
+  mutate(streak = row_number()) %>%
+  ungroup() %>%
+  filter(gain_bin == 1)
+
+longest_streak <- streak %>%
+  filter(streak == max(streak))
+
+
+highest_avg <- games_df %>%
+  filter(avg == max(avg))
+
+
+highest_month <- games_df %>%
+  group_by(end_month) %>%
+  slice_max(avg, 1) %>%
+  ungroup() %>%
+  count(gamename) %>%
+  arrange(desc(n)) %>%
+  head(1)
+  
+
+best8 <- games_df %>%
+  filter(timeline == 104) %>%
+  filter(avg == max(avg))
+
+
+best_launch <- games_df %>%
+  filter(timeline == 1) %>%
+  filter(avg == max(avg))
+
+```
+
+
+```{r colors}
+
+palette <- c("PLAYERUNKNOWN'S BATTLEGROUNDS" = "#F7BB0B", "Cyberpunk 2077" = "#C88BD9", "Counter-Strike: Global Offensive" = "#49B3BF", "Dota 2" = "#94BF75", "Soundpad" = "#FD5403", "others" = "#2e2e2e")
+
+title_clr <- "#94BCFF"
+bck_clr <- "grey20"
+
+```
+
+
+```{r annotations}
+
+annotation <- tibble(text = c(glue("{highest_avg$gamename} rose quickly to reach the highest average number of players. The fall was equally impressive, and went below {highest_month$gamename} & {best8$gamename}, but it's still the third most played game on the platform."),
+                              glue("{best_launch$gamename} had the highest number of players for the first month, but dropped quickly due to technical bugs and players' disappointment vs expectation."),
+                              glue("{highest_month$gamename} was the top played game for {highest_month$n} months, and still the second played game after more  than 8 years."),
+                              glue("{longest_streak$gamename} had the longest streak of positive gain of users, with {longest_streak$streak} months of continuous growth. {longest_streak$gamename} is an audio extension to use voice chats in high audio quality. The highest game in this category is Age of Wonders III, with 17 months of positive gain."),
+                              glue("{best8$gamename} is the game with the highest number of players after more than 8 years, and the highest of all games since September 2019. The rise since 2018 is due to its release as free-to-play.")),
+                     x = c(8, -5, 25, 30, 65),
+                     y = c(2000000, -150000, 830000, -150000, 900000),
+                     gamename = c(highest_avg$gamename, best_launch$gamename, highest_month$gamename,longest_streak$gamename, best8$gamename),
+                     wrap_width = c(60, 60, 60, 100, 63)
+                    )
+
+annotation <- annotation %>%
+  mutate(text = map2_chr(.x = text, .y = wrap_width, .f = str_wrap))
+
+axis <- tibble(x = c(-1, -1, -1, -1),
+                 xend = c(104, 104, 25, 25),
+               y = seq(0,1500000, 500000),
+               yend = seq(0,1500000, 500000)
+               )
+xlabels <- tibble(x = seq(6,102,6),
+                 y = rep(-40000, 17))
+
+arrows <- tibble(x = c(18, -3, 51, 29, 87),
+                 xend = c(12, 0.5, 56, 26, 91.5),
+                 y = c(1780000, -140000, 820000, -180000, 720000),
+                 yend = c(1550000, 280000, 620000, -10000, 570000),
+                 curvature = c(-0.3, -0.4, -0.4, -0.4, 0.4), 
+                 gamename = c(highest_avg$gamename, best_launch$gamename, highest_month$gamename, longest_streak$gamename, best8$gamename))
+
+other_games <- games_df %>%
+  filter(!gamename %in% names(palette))
+
+select_games <- games_df %>%
+  filter(gamename %in% names(palette))
+
+```
+
+
+```{r linechart}
+
+linechart <- ggplot() +
+  geom_segment(data = axis, aes(x = x, xend = xend, y = y , yend = yend), color = "white", linetype = "13") +
+  geom_text(data = axis, aes(x = x, y = y, label = scales::comma(y)), color = "white", size = 3.5, nudge_y = 30000, nudge_x = 1, family = "roboto condensed", hjust = 0) +
+  geom_text(data = xlabels, aes(x = x, y = y, label = x), color = "white", size = 3.5, family = "roboto condensed", hjust = 0.5) +
+  geom_line(data = other_games, aes(x = timeline, y = avg, group = gamename), alpha = 0.2, color = "grey80") +
+  geom_line(data = select_games, aes(x = timeline, y = avg, group = gamename, color = gamename), size = 0.8) +
+  geom_text(data = annotation, aes(x, y, label = text, color = gamename), hjust = 0, vjust = 1, family = "roboto", size = 3, fontface = "bold") +
+  geom_curve(data = head(arrows,4), aes(x = x, xend = xend, y = y , yend = yend, color = gamename) , arrow = arrow(ends = "last", length = unit(0.1, "inches")), curvature = -0.4)+
+  geom_curve(data = tail(arrows,1), aes(x = x, xend = xend, y = y , yend = yend, color = gamename) , arrow = arrow(ends = "last", length = unit(0.1, "inches")), curvature = 0.4)+  
+  annotate("text", x = 102, y = -140000, label = "Game longevity in months", color = "white", size = 3.5, family = "roboto condensed", hjust = 1)+
+  annotate("text", x = -3, y = 1200000, label = "# of players (monthly average)", color = "white", size = 3.5, family = "roboto condensed", angle = 90, vjust = 1)+  
+  scale_y_continuous(limits = c(-190000, 2000000)) +
+  scale_x_continuous(expand = c(0.01,0.02)) +
+  scale_color_manual(values = palette) +
+  guides(color = FALSE)+
+  theme_void() +
+  theme(plot.background = element_rect(fill = bck_clr, color = NA),
+        panel.background = element_rect(fill = bck_clr, color = NA),
+        panel.spacing.x = unit(0, "lines"),
+        plot.margin = margin(0,0,0,0))
+
+```
+
+```{r data_score}
+
+score <- tibble(category = c("** Highest number **", "** Best launch **", "** Stays at the top **", "** Gain streak **", "** Best 8 years **"),
+                name = c(highest_avg$gamename, best_launch$gamename, highest_month$gamename, longest_streak$gamename, best8$gamename),
+                score = c(highest_avg$avg, best_launch$avg, highest_month$n, longest_streak$streak, best8$avg),
+                units = c("players", "players", "months", "months", "players"),
+                x = rep(0,5),
+                y = c(270, 220, 180, 140, 100))
+
+score <- tibble(category = c("** Highest number **", "** Best 8 years **", "** Best launch **", "** Stays at the top **", "** Gain streak **"),
+                name = c(highest_avg$gamename, best8$gamename, best_launch$gamename, highest_month$gamename, longest_streak$gamename),
+                score = c(highest_avg$avg, best8$avg, best_launch$avg, highest_month$n, longest_streak$streak),
+                units = c("players", "players", "players", "months", "months"),
+                x = rep(0,5),
+                y = c(270, 220, 170, 130, 90))
+
+title <- tibble(text = c("Name", "Score", "Medal"),
+                x = c(100, 380, 620),
+                y = rep(310, 3))
+
+score <- score %>%
+  mutate(score = round(score,0))
+
+```
+
+```{r score_board}
+
+update_geom_defaults("text", list(family = "start2p", size = 2.5))
+
+score_plt <- ggplot() +
+  annotate("text", x = 400, y = 350, label = "High Scores", size = 5, hjust=0.5, color = title_clr) +
+  geom_text(data = score, aes(x + 580, y, label = category, color = name), hjust = 0, vjust = 1)+
+  geom_text(data = score, aes(x + 20, y, label = str_wrap(name, width = 20), color = name), hjust = 0, vjust = 1)+
+  geom_text(data = score, aes(x + 420, y, label = scales::comma(score), color = name), hjust = 1, vjust = 1) +
+  geom_text(data = score, aes(x + 440, y, label = units, color = name), hjust = 0, vjust = 1) +
+  geom_text(data = title, aes(x, y, label = str_to_upper(text)), hjust = 0, vjust = 1, color = title_clr, size = 3) +
+  scale_color_manual(values = palette) +
+  scale_x_continuous(limits = c(0, 880)) +
+  scale_y_continuous(limits = c(0, 370)) +
+  guides(color = FALSE) +
+  theme_void()+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank())
+
+```
+
+
+```{r final}
+
+final <- linechart + inset_element(score_plt, 0.5,0.5,1,1) +
+  plot_annotation(
+    caption = "Visualization: Christophe Nicault | Data: Steam",
+    theme = theme(
+      plot.margin = margin(10,10,10,10),
+      plot.background = element_rect(fill = bck_clr, color = NA),
+      plot.caption = element_text(family = "techmono", size = 9, color = "white", margin = margin(15,0,0,0), hjust = 0.95)      
+    )
+  )
+
+ragg::agg_png(here::here("render", paste0("games_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")), res = 320, width = 14, height = 8, units = "in")
+
+final
+  
+dev.off()
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
