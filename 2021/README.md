@@ -1,5 +1,13 @@
 # Tidy Tuesday data visualisation
 
+## 2021 week 13 - UN votes
+
+Profil of UN votes per country
+
+![UN votes](/2021/2021-13-UN_votes/un_votes.png)
+
+----
+
 ## 2021 week 12 - Video Games
 
 Video Games Awards

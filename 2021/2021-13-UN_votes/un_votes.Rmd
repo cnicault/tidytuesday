@@ -1,0 +1,268 @@
+---
+title: "un_votes_clean"
+author: "Christophe Nicault"
+date: "24/03/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(tidytuesdayR)
+library(tidyverse)
+library(tidytext)
+library(janitor)
+library(FactoMineR)
+library(geofacet)
+library(magick)
+library(ggforce)
+library(cowplot)
+library(ggtext)
+library(showtext)
+
+font_add_google("Roboto", "roboto")
+font_add_google("Roboto Condensed", "roboto condensed")
+font_add_google("Oswald", "oswald")
+font_add_google("Share Tech Mono", "techmono")
+
+```
+
+
+```{r}
+
+tuesdata <- tidytuesdayR::tt_load(2021, week = 13)
+readme(tuesdata)
+
+unvotes <- tuesdata$unvotes
+roll_calls <- tuesdata$roll_calls
+issues <- tuesdata$issues
+```
+
+
+```{r}
+votes_ctr <- unvotes %>%
+  group_by(country, country_code) %>%
+  summarise(yes = sum(vote == "yes"),
+            no = sum(vote == "no"),
+            abstain = sum(vote == "abstain"),
+            total_vote = yes + no + abstain) %>%
+  ungroup() %>%
+  mutate(perc_no = no / (yes + no + abstain),
+         perc_yes = yes / (yes + no + abstain),
+         perc_abs = abstain / (yes + no + abstain),
+         total_vote_scale = scales::rescale(total_vote, to = c(0,1)))
+```
+
+
+
+```{r}
+type <- roll_calls %>%
+  separate(short, sep = ",", into = c("main", "delete")) %>%
+  select(rcid, main)
+
+tidytext <- type %>%
+  unnest_tokens(word, main)
+
+tidytext %>%
+  count(word) %>%
+  arrange(desc(n)) %>% View()
+  
+
+pairs <- tidytext %>%
+  filter(word %in% c("palestin", "disarmament", "nuclear", "africa", "denuclearization", "occupied", "weapon", "race", "decolonization", "discrimination"))
+
+get_dupes(pairs)
+id <- get_dupes(pairs, rcid) %>% distinct(rcid) %>% pull()
+
+pairs <- unique(pairs)
+pairs <- pairs %>% 
+  mutate(word = ifelse(rcid %in% id, "disarmament", word)) %>%
+  unique()
+
+votes_w <- unvotes %>%
+  left_join(pairs) %>%
+  mutate(word = ifelse(is.na(word), "other", word))
+
+
+votes_w %>%
+  group_by(country, vote, word) %>%
+  count()
+
+df <- expand.grid(country = unique(votes_w$country), vote = unique(votes_w$vote), word = unique(votes_w$word))
+
+df_prep <- df %>% 
+  left_join(votes_w) %>%
+  count(country, word, vote) %>%
+  group_by(country, word) %>%
+  mutate(perc = n / sum(n)) %>% 
+  ungroup() %>%
+  pivot_wider(id_cols = country, names_from = c("vote", "word"), values_from = "perc") 
+  
+
+```
+
+```{r}
+palette <- c("2" = "#B551AB", "1" = "#60B53F", "3" = "#4885B5", "4" = "#B59564")
+```
+
+
+```{r}
+set.seed(213)
+
+
+pca_df <- df_prep %>%
+  left_join(select(votes_ctr, country, contains("perc")), by = c("country")) %>%
+  select(-country) 
+
+scale_df <- scale(pca_df)
+pca <- PCA(scale_df)
+
+pca_tb <- as_tibble(unlist(pca$ind$coord))
+
+km <- kmeans(pca_tb, centers = 4)
+#km <- kmeans(scale_df, centers = 4)
+
+df_prep$cluster <- km$cluster
+df_prep$dim1 <- pca$ind$coord[,1]
+df_prep$dim2 <- pca$ind$coord[,2]
+df_prep$dim3 <- pca$ind$coord[,3]
+df_prep$dim4 <- pca$ind$coord[,4]
+
+ggplot(df_prep, aes(dim1, dim2, color = as.factor(cluster))) +
+  geom_point()+
+scale_color_manual(values = palette) 
+
+plot(pca, axes=1:2)
+plot(pca, axes=1:2, choix="var")
+plot(pca, axes=1:3)
+plot(pca, axes=1:3, choix="var")
+
+
+ggplot(df_prep, aes(dim1, dim3, color = as.factor(cluster))) +
+  geom_point()+
+scale_color_manual(values = palette) 
+
+world <- world_countries_grid1 %>%
+  separate(code_iso_3166_2, c("delete", "a2"), sep = ":", remove = TRUE) %>%
+  select(-delete) %>%
+  left_join(votes_ctr, by = c("a2" = "country_code")) 
+```
+
+
+```{r}
+
+showtext_opts(dpi = 320)
+showtext_auto(enable = TRUE)
+
+xc <- 1
+yc <- 1
+rc <- 1
+
+perc_yes <- 0.9
+perc_no <- 0.5
+perc_abs <- 0.3
+
+legend <- ggplot() +
+  geom_circle(aes(x0 = xc, y0 = yc, r = rc), fill = "#7e7e7e", color = "#7e7e7e", size = 0.5, alpha = 0.5) +
+  annotate("text",x = 3.5, y = 2, label = "Yes", hjust = 00, size = 4)+
+  annotate("text",x = -1, y = 2, label = "No", hjust = 1, size = 4)+
+  annotate("text",x = 2, y = -0.25, label = "Abstain", hjust = 0, size = 4)+
+  geom_ellipse(aes(x0 = xc + (rc)* cos(pi/4), y0 = yc + (rc) * sin(pi/4), a = perc_yes*2, b = 0.7, angle = pi/4), fill = "#7e7e7e", color = "#7e7e7e")+
+  geom_ellipse(aes(x0 = xc - (rc)* cos(pi/4), y0 = yc + (rc) * sin(pi/4), a = perc_no*2, b = 0.7, angle = -pi/4), fill = "#7e7e7e", color = "#7e7e7e")+
+    geom_ellipse(aes(x0 = xc, y0 = yc - rc, a = perc_abs*2, b = 0.7, angle = -pi/2), fill = "#7e7e7e", color = "#7e7e7e")+ 
+  geom_circle(aes(x0 = xc, y0 = yc, r = rc), fill = "white", color = "white", size = 0.5) +  
+  geom_circle(aes(x0 = xc, y0 = yc, r = rc), fill = "#7e7e7e", color = "#7e7e7e", size = 0.5, alpha = 0.3) +  
+  annotate("text",x = xc, y = xc, label = "CY", hjust = 0.5, vjust = 0.5, size = 5, fontface = "bold",color = "#7e7e7e", family = "roboto")+
+  scale_x_continuous(limits = c(-2,5))+
+  coord_equal() +
+  labs(title = "Percentage of\nvote result") +
+  theme_void()+
+  theme(plot.title = element_text(family = "roboto condensed", hjust = 0.4, margin = margin(0,0,10,0)))
+
+text <- "The colors show the countries who have similar patterns in UN votes.<br> These pattern are based on an analysis of the votes for the most common subjects :<br> Palestine, disarmament, nuclear, Africa, denuclearization, occupied, weapon, race,<br> decolonization, discrimination. <br> According to these subjects, the voting patterns of the United Kingdom appears to be<br> more similar to the United States and Israel, than the European countries around.<br><span style='color:#4885B5'>**The countries in blue**</span> are more balanced between yes, no and abstain, <br>and they tend to have a higher abstention rate on subjects such as disarmament,<br> discrimination, decolonization, where <span style='color:#B551AB'>**the countries in purple**</span> are more characterized by<br> the position on Palestine and occupied territories, and have a higher rate of voting no.<br><span style='color:#60B53F'>**The countries in green**</span> and <span style='color:#B59564'>**the countries in brown**</span> vote mainly yes on topics of denuclearization,<br>decolonization, nuclear, disarmament Africa.<br>The main difference is on the Palestine, where green countries are more associated to voting yes."
+
+
+text_legend <- ggplot() +
+  annotate("richtext", x = 1, y = 1, label = text, fill = NA, color = "black", label.color = NA, hjust = 0, size = 4, family = "roboto condensed") +
+  coord_equal(xlim = c(0, 200), ylim = c(0, 2), clip = "off") +
+  theme_void()
+
+text_legend
+ragg::agg_png(here::here("render", paste0("text_legend",".png")), res = 320, width = 7, height = 3, units = "in")
+
+text_legend
+  
+dev.off()
+
+text_legend <- image_read(here::here("render","text_legend.png"))
+text_legend <- magick::image_transparent(text_legend, color = "#ffffff", fuzz = 0)
+
+```
+
+I had a weird bug with ggtext and cowplot. When using ggtext and cowplot, the space between words 
+become random. If I use cowplot, with a normal text, it works, if I use ggtext without cowplot, it works, but combining the two doesn't look nice. As I want to use colors in the text, I had to find a solution.
+So I use ggtext, save the text as a separate image, open it and set the background transparent with magick, and then use it with cowplot::draw_image. Note that I didn't manage to get the transparency while saving ragg::agg_png.
+
+
+```{r}
+
+
+world <- world %>% 
+  left_join(select(df_prep, country, cluster))
+
+update_geom_defaults("text", list(family = "roboto"))
+
+world_countries_grid1 <- world_countries_grid1 %>%
+  filter(row <= 22)
+
+world %>%
+  filter(a2 != "AQ") %>%
+  filter( row <= 22) %>%
+  select(name, a2, perc_yes, perc_no, perc_abs, total_vote_scale, cluster) %>%
+  mutate(cluster = as.factor(cluster)) %>%
+  ggplot() +
+  geom_circle(aes(x0 = xc, y0 = yc, r = rc, fill = cluster, color = cluster), size = 0.5, alpha = 0.5) +
+  geom_ellipse(aes(x0 = xc + (rc)* cos(pi/4), y0 = yc + (rc) * sin(pi/4), a = perc_yes*2, b = 0.7, angle = pi/4, fill = cluster, color = cluster))+
+  geom_ellipse(aes(x0 = xc - (rc)* cos(pi/4), y0 = yc + (rc) * sin(pi/4), a = perc_no*2, b = 0.7, angle = -pi/4, fill = cluster, color = cluster))+
+    geom_ellipse(aes(x0 = xc, y0 = yc - rc, a = perc_abs*2, b = 0.7, angle = -pi/2, fill = cluster, color = cluster))+  
+    geom_circle(aes(x0 = xc, y0 = yc, r = rc), fill = "white", color = "white", size = 0.5) +
+  geom_circle(aes(x0 = xc, y0 = yc, r = rc, fill = cluster, color = cluster), size = 0.5, alpha = 0.3) +
+  geom_text(aes(x = xc,y = xc, label = a2, color = cluster), hjust = 0.5, vjust = 0.5, size = 3.5, fontface = "bold")+  
+  scale_fill_manual(values = palette, na.value = "#7e7e7e") +
+  scale_color_manual(values = palette, na.value = "#7e7e7e") +
+  coord_equal() +
+  facet_geo(~ name, grid = "world_countries_grid1") +
+  guides(fill = FALSE, color = FALSE) +
+  labs(title = "Profile of UN votes for each country",
+       caption = "Visualization: Christophe Nicault | Data: Harvard Dataverse") +
+  theme_void() +
+  theme(plot.background = element_blank(),
+        strip.background = element_blank(),
+        strip.text = element_blank(),
+        panel.spacing = unit(0, "in"),
+        axis.text = element_blank(),
+        axis.title = element_blank(),
+        axis.ticks = element_blank(),
+        plot.margin = margin(10,40,0,120),
+        plot.title = element_text(family = "oswald", size = 20, hjust = 0.5, margin = margin(10,0,20,0), face = "bold"),
+        plot.caption = element_text(family = "techmono", size = 11, color = "black", margin = margin(5,0,0,0), hjust = 0.95)
+        ) -> plt
+  
+
+final <-ggdraw(plt) +
+  draw_plot(legend , 0.05, 0.4, 0.15, 0.15) +
+  #draw_plot(text_legend, 0, 0, 0.4, 0.4)   # remove because it bugs with ggtext
+  draw_image(text_legend, 0, 0, 0.5, 0.35)
+
+ragg::agg_png(here::here("render", paste0("un_votes_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")), res = 320, width = 16, height = 12, units = "in")
+
+final
+  
+dev.off()
+
+```
+
+
