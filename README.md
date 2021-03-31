@@ -1,5 +1,13 @@
 # Tidy Tuesday data visualisation
 
+## 2021 week 14 - Makeup Shades
+
+Bias in beauty show by label sequences  in beauty product
+
+![Bias in beauty](/2021/2021-14-makeup_shades/makeup_shades.png)
+
+----
+
 ## 2021 week 13 - UN votes
 
 Profil of UN votes per country

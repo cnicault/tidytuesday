@@ -1,0 +1,188 @@
+---
+title: "Makeup Shades"
+author: "Christophe Nicault"
+date: "31/03/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r load_packages}
+
+library(tidytuesdayR)
+library(tidyverse)
+library(magick)
+library(cowplot)
+library(showtext)
+
+font_add_google("Oswald", "oswald")
+font_add_google("Roboto", "roboto")
+font_add_google("Roboto Condensed", "roboto condensed")
+font_add_google("Share Tech Mono", "techmono")
+
+showtext_opts(dpi = 320)
+showtext_auto(enable = TRUE)
+
+```
+
+
+```{r load_data}
+
+tuesdata <- tidytuesdayR::tt_load(2021, week = 14)
+sephora <- tuesdata$sephora
+ulta <- tuesdata$ulta
+allShades <- tuesdata$allShades
+allCategories <- tuesdata$allCategories
+allNumbers <- tuesdata$allNumbers
+readme(tuesdata)
+
+```
+
+```{r data_prep}
+
+shades_number <- allNumbers %>%
+  group_by(product) %>%
+  arrange(numbers) %>%
+  mutate(idx = row_number(),
+         size = n(),
+         close = abs(lightness-0.5),
+         neutral = ifelse(close == min(close), 1, 0)) %>%
+  ungroup() %>%
+  mutate(product = fct_reorder(product, size)) 
+
+# build df with 30 colors width
+x <- rep(seq(1,30,1),103)
+y <- sort(rep(seq(1,103,1),30))
+
+# All complete rows
+allshades_p1 <- shades_number %>%
+  arrange(lightness) %>%
+  filter(row_number() <= 3090)
+
+allshades_p1$posx <- x
+allshades_p1$posy <- y
+
+# Last incomplete row
+allshades_p2 <- shades_number %>%
+  arrange(lightness) %>%
+  filter(row_number() > 3090) %>%
+  mutate(posx = row_number(),
+         posy = 104)
+
+allshades <- allshades_p1 %>%
+  bind_rows(allshades_p2) 
+
+middle <- allshades %>%
+  arrange(lightness) %>%
+  mutate(middle = ifelse(lightness > 0.5, 1, 0)) %>%
+  filter(middle == 1) %>%
+  head(30)
+
+sep <- middle %>%
+ head(1)
+  
+
+```
+
+
+```{r colors}
+
+palette_2 <- c("perc_light" = "#ECCBB7", "perc_dark" = "#7B5241")
+txt_clr <- "grey90"
+bck_clr <- "grey40"
+update_geom_defaults("text", list(family = "roboto condensed"))
+
+```
+
+```{r}
+
+text <- "The products at a beginning of a sequence are prioritized and thus are more accessible\n In all products, 97% display lighter shades first (ligher colors at the bottom of the graph).\n There are also only few products with 50% of shades with as many dark shades as light ones,\n most of them are unbalanced toward lighter shades.\n Overall, there are 22.7% of darker shades (lightness < 0.5) vs 78.3% of lighter\n shades (lightness > 0.5)"
+
+shades_indexed <- shades_number %>%
+  ggplot() +
+  geom_tile(aes(x = product, width = 1, y = idx, height = 1, fill = hex)) +
+  annotate("text", x = 70, y = 55, label = text, hjust = 0, size = 3.5, color = txt_clr) +
+  scale_color_identity() +
+  scale_fill_identity() +
+  scale_y_continuous(limits=c(-20,65)) +
+  labs(title = "Bias in beauty shown by label sequences",
+       caption = "Visualization: Christophe Nicault | Data: The Pudding data") +
+  theme_void() +
+  theme(plot.background = element_rect(fill = bck_clr),
+        plot.margin = margin(0,30,0,30),
+        panel.spacing = unit(0,"mm"),
+        plot.title = element_text(family = "oswald", size = 24, face = "bold", hjust = 0.5, margin = margin(10,0,0,0), color = txt_clr),
+        plot.caption = element_text(family = "techmono", size = 9, color = txt_clr, margin = margin(0,0,10,0))
+        )
+
+
+prop_lightness <- shades_number %>%
+  group_by(product) %>%
+  mutate(light = ifelse(lightness > 0.5, 1, 0)) %>%
+  summarise(
+            perc_light = mean(light),
+            perc_dark = 1-perc_light) %>%
+  ungroup() %>%
+  pivot_longer(cols = c(perc_light, perc_dark), names_to = "shade", values_to = "value") %>% 
+  ggplot() +
+  geom_col(aes(x = product, y = value, fill = shade, color = shade)) +
+  annotate("segment", x = 0, xend = 70, y = 0.5, yend = 0.5, linetype = "13") +
+  annotate("segment", x = 78, xend = 145, y = 0.5, yend = 0.5, linetype = "13") +
+  annotate("text", x = 74, y = 0.5, label = "50 % ") +
+  scale_fill_manual(values = palette_2, labels = c("lightness < 0.5", "lightness > 0.5")) +
+  scale_color_manual(values = palette_2) +
+    guides(fill = guide_legend(label.position = "top",
+                               title.hjust = 0.5,
+                               keywidth = unit(6, "line"),
+                               keyheight = unit(1, "line"),
+                               nrow = 1
+                               ),
+           color = FALSE
+         )+
+  theme_void() +
+  theme(plot.background = element_rect(fill = bck_clr, color = NA),
+        plot.margin = margin(0,30,0,30),
+        panel.spacing = unit(0,"mm"),
+        legend.position = "bottom",
+        legend.text = element_text(color = txt_clr, size = 9),
+        legend.title = element_blank())
+
+
+all_shades_plt <- allshades %>%
+  ggplot() +
+  geom_tile(aes(x = posy, y = posx, width = 1, height = 1, fill = hex, color = hex)) +
+  geom_segment(data = middle, aes(x = posy + 0.5, xend = posy + 0.5, y = posx - 0.5, yend = posx + 0.5), size = 0.4, inherit.aes = FALSE, color = "grey80") +
+  geom_segment(data = sep, aes(x = posy + 0.5, xend = posy + 1.5, y = posx - 0.5, yend = posx - 0.5), size = 0.4, inherit.aes = FALSE, color = "grey80") +  
+  annotate("segment", x = 24.5, xend = 24.5, y = 30, yend = 60, size = 0.4, linetype = "12", color = txt_clr)+
+  annotate("text", x = 24, y = 61, label = "lightness < 0.5", hjust = 1, angle = 7, vjust = 0, color = txt_clr)+
+  annotate("text", x = 25, y = 61, label = "lightness > 0.5", hjust = 1, angle = 7, vjust = 1, color = txt_clr)+
+  # annotate("text", x = 18, y = 60, label = "22.7 % with\n lightness < 0.5", hjust = 1, vjust = 0, color = "grey80")+
+  # annotate("text", x = 47, y = 47, label = "77.3 % with\n lightness > 0.5", hjust = 1, vjust = 0, color = "grey80")+
+  annotate("text", x = 18, y = 58, label = "22.7 %", hjust = 1, vjust = 0, color = txt_clr, size = 8, family = "oswald", fontface = "bold")+  
+  annotate("text", x = 60, y = 43, label = "77.3 % ", hjust = 1, vjust = 0, color = txt_clr, size = 8, family = "oswald", fontface = "bold")+    
+  scale_color_identity() +
+  scale_fill_identity() +
+  coord_polar(clip = "off") +
+  scale_y_continuous(expand = c(0.2,0.2)) +
+  theme_void()
+
+```
+
+```{r assemble}
+
+final <- ggdraw(shades_indexed)+
+  draw_plot(prop_lightness, 0, 0.06, 1, 0.2) +
+  draw_plot(all_shades_plt, -0.25, 0.2, 0.9, 0.9)
+
+
+ragg::agg_png(here::here("render", paste0("makeup_shades_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")), res = 320, width = 12, height = 8, units = "in")
+
+final
+  
+dev.off()
+
+```
+
