@@ -1,0 +1,194 @@
+---
+title: "Global Deforestation"
+author: "Christophe Nicault"
+date: "07/04/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load_packages}
+
+library(tidytuesdayR)
+library(tidyverse)
+library(patchwork)
+library(ggfx)
+library(glue)
+library(tidytext)
+library(showtext)
+
+font_add_google("Oswald", "oswald")
+font_add_google("Roboto Condensed", "roboto condensed")
+font_add_google("Roboto", "roboto")
+font_add_google("Share Tech Mono", "techmono")
+
+showtext_opts(dpi = 320)
+showtext_auto(enable = TRUE)
+
+```
+
+```{r load_data}
+
+tuesdata <- tidytuesdayR::tt_load(2021, week = 15)
+readme(tuesdata)
+
+forest <- tuesdata$forest
+forest_area <- tuesdata$forest_area
+brazil_loss <- tuesdata$brazil_loss
+soybean_use <- tuesdata$soybean_use
+vegetable_oil <- tuesdata$vegetable_oil
+
+```
+
+
+```{r data_prep}
+
+# relevel for colors
+forest_df <- forest %>%
+  filter(!is.na(code), entity != "World") %>% 
+  mutate(level = case_when(
+    net_forest_conversion < -400000 ~ "ln3",
+    between(net_forest_conversion, -400000, -200000) ~ "ln2",
+    between(net_forest_conversion, -200000, -100000) ~ "ln1",
+    between(net_forest_conversion, -100000, 0) ~ "ln0",
+    net_forest_conversion > 400000 ~ "lp3",
+    between(net_forest_conversion, 200000, 400000) ~ "lp2",
+    between(net_forest_conversion, 100000, 200000) ~ "lp1",
+    between(net_forest_conversion, 0, 100000) ~ "lp0"
+  )) %>%
+  mutate(level = fct_relevel(level, c("ln3", "ln2", "ln1", "ln0", "lp0", "lp1", "lp2", "lp3"))) 
+  
+# rank for positionning
+rank <- forest_df %>%
+  distinct(year) %>%
+  mutate(posy = rank(year))
+
+# Data for both side (deforestation & reforestation)
+neg <- filter(forest_df, net_forest_conversion < 0) %>%
+  mutate(country = entity,
+         entity = reorder_within(entity, by = net_forest_conversion, within = year)) %>%
+  left_join(rank)
+pos <- filter(forest_df, net_forest_conversion > 0) %>%
+  mutate(country = entity,
+         entity = reorder_within(entity, by = -net_forest_conversion, within = year)) %>%
+  left_join(rank)
+
+# total bar & year label
+stat <- forest_df %>%
+  group_by(year) %>%
+  summarise(net_forest_conversion = sum(net_forest_conversion)) %>%
+  ungroup() %>%
+  mutate(posy = rank(year)) 
+
+# top countries for label
+country_neg <- neg %>% 
+  group_by(year) %>%
+  arrange(desc(net_forest_conversion)) %>%
+  mutate(cum = cumsum(net_forest_conversion),
+         posx = lag(cum) + net_forest_conversion / 2) %>%
+  slice_min(n = 1, order_by = net_forest_conversion) %>%
+  ungroup() %>%
+  left_join(rank)
+
+country_pos <- pos %>% 
+  group_by(year) %>%
+  arrange(net_forest_conversion) %>%
+  mutate(cum = cumsum(net_forest_conversion),
+         posx = lag(cum) + net_forest_conversion / 2) %>%
+  slice_max(n = 1, order_by = net_forest_conversion) %>%
+  ungroup() %>%
+  left_join(rank)
+
+# short axis
+axis <- tibble(posy =  seq(-10000000, 5000000, 2500000),
+               posx = c(2.5, 2.5, 4.4, 4.4, 4.4, 4.4, 3.4))
+  
+
+legend <- tibble(level = c("ln3", "ln2", "ln1", "ln0", "lp0", "lp1", "lp2", "lp3"),
+       ymin = c(-400000, -200000, -100000, 0, 0, 100000, 200000, 400000),
+       ymax = c(-600000, -400000, -200000, -100000, 100000, 200000, 400000, 600000))
+
+legend_txt <- legend %>%
+  distinct(ymin) %>%
+  mutate(offset = row_number() %% 2)
+
+```
+
+```{r colors}
+
+palette <- c("ln3" = "#D73027", "ln2" = "#F46D43", "ln1" = "#FDAE61", "ln0" = "#FEE08B", "lp0" = "#D9EF8B", "lp1" = "#A6D96A", "lp2" = "#66BD63", "lp3" = "#1A9850")
+
+```
+
+```{r main_plot}
+
+main_plt <- ggplot() +
+  geom_segment(data = axis, aes(x = 0.25, xend = posx, y = posy, yend=posy), linetype = "13", size = 0.3)+
+  as_group(
+    geom_col(data = neg, aes(posy, net_forest_conversion, group = entity, fill = level), position = "stack", color = "grey80", width = 0.5, size = 0.2),
+    geom_col(data = pos, aes(posy, net_forest_conversion, group = entity, fill = level), position = "stack", color = "grey80", width = 0.5, size = 0.2),
+          id = "col"
+  )+
+  with_blend(
+    geom_text(data = stat, aes(x = posy, y = 0, label = year), size = 8, fontface = "bold", family = "oswald"),
+    bg_layer = "col",
+    blend_type = "pegtop_light"
+  )+
+  geom_text(data = country_neg, aes(x = posy, y = posx, label = country), size = 8, fontface = "bold", color = "#A3241D", family = "roboto condensed") +
+  geom_text(data = country_pos, aes(x = posy, y = posx, label = country), size = 8, fontface = "bold", color = "#116636", family = "roboto condensed") +
+  geom_col(data = stat, aes(posy-0.375, net_forest_conversion), fill = "#A3241D", width = 0.25)+
+  scale_fill_manual(values = palette) +
+  scale_x_continuous(breaks = rank$posy, labels = as.character(rank$year), limits = c(0, 4.4)) +
+  scale_y_continuous(breaks = seq(-10000000, 5000000, 2500000), labels = glue("{scales::comma(seq(-10000000, 5000000, 2500000))} ha")) +
+  coord_flip()+
+  guides(fill = FALSE) +
+  theme_void() +
+  theme(plot.margin = margin(0,0,90,0), 
+        axis.text.x = element_text(family = "roboto condensed", size = 10, margin = margin(-15,0,0,0)),
+        )
+
+```
+
+```{r legend}
+
+legend_plt <- legend %>%
+  ggplot() +
+  geom_rect(aes(xmin = 0, xmax = 1, ymin = ymin, ymax = ymax, fill = level), color = "grey70") +
+  geom_text(data = legend_txt, aes(x = 1.5 + offset, y = ymin, label = glue::glue("{scales::comma(ymin)} ha")), vjust = 0, size = 3, family = "roboto condensed")+
+  geom_segment(data = legend_txt, aes(x = 1, xend = 1.5 +offset, y = ymin, yend = ymin), linetype = "12", color = "grey40") +
+  annotate("text", x = -1, y = 0, label = "Country's annual change in forest area", family = "roboto condensed", size = 3.5, vjust = 1) +
+  scale_fill_manual(values = palette) +
+  scale_x_continuous(limits = c(-1.7, 4)) +
+  coord_flip()+
+  guides(fill = FALSE) +
+  theme_void()
+
+```
+
+```{r assemble}
+
+final <- main_plt + inset_element(legend_plt, 0.1,0.02,0.9,0.23, align_to = "full")+
+   plot_annotation(
+      title = "Annual change in forest area.",
+      subtitle = "The main bars represent the change for each country per year.\nThe smaller bars represent the total change worldwide (reforestation minus deforestation).",
+      caption = "Visualization: Christophe Nicault | Data: Our World in Data",
+      theme = theme(
+        plot.margin = margin(0,15, 10, 15) ,
+        plot.background = element_rect(fill = "white"),
+        plot.title = element_text(family = "oswald", size = 17, hjust = 0.5, face = "bold", margin = margin(10,0,5,0)),
+        plot.subtitle = element_text(family = "oswald", size = 12, hjust = 0.5, margin = margin(0,0,30,0)),
+        plot.caption = element_text(family = "techmono", size = 8, hjust = 0.98, margin = margin(15,0,0,0))      
+      )
+    )
+
+ragg::agg_png(here::here("render", paste0("deforestation_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")), res = 320, width = 10, height = 6, units = "in")
+
+final
+  
+dev.off()
+
+```
+
+

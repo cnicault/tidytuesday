@@ -1,5 +1,12 @@
 # Tidy Tuesday data visualisation
 
+## 2021 week 15 - Global deforestation
+
+Annual changes in forest area over the year
+
+![Annual changes in forest area over the year](/2021/2021-15-global_deforestation/deforestation.png)
+
+----
 
 ## 2021 week 14 - Makeup Shades
 
