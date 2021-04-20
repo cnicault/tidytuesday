@@ -2,9 +2,9 @@
 
 ## 2021 week 15 - Global deforestation
 
-Annual changes in forest area over the year
+Annual changes in forest area over the years
 
-![Annual changes in forest area over the year](/2021/2021-15-global_deforestation/deforestation.png)
+![Annual changes in forest area over the years](/2021/2021-15-global_deforestation/deforestation.png)
 
 ----
 
