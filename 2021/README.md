@@ -1,5 +1,13 @@
 # Tidy Tuesday data visualisation
 
+## 2021 week 17 - Netflix Shows
+
+Evolution of the number of movies and TV shows on Netflix
+
+![Evolution of the number of movies and TV shows on Netflix](/2021/2021-17-Netflix_shows/netflix_shows.png)
+
+----
+
 ## 2021 week 15 - Global deforestation
 
 Annual changes in forest area over the years
