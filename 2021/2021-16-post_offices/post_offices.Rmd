@@ -70,8 +70,8 @@ post_trend <- active %>%
   replace_na(list(nb_established = 0, nb_discontinued = 0)) %>%
   mutate(gap = nb_established - nb_discontinued)
 
-years <- tibble(year = c(seq(1800, 1890, 15), seq(1910, 2020, 15)),
-       y = c(rep(-150, 7), rep(150,8)))
+years <- tibble(year = c(seq(1780, 1885, 15), seq(1915, 2020, 15)),
+       y = c(rep(-150, 8), rep(150,8)))
 ```
 
 ```{r}
@@ -130,7 +130,7 @@ final <- main +
   inset_element(lg1, 0.65,0.05,0.95,0.35, align_to = "full", clip = FALSE) +
   inset_element(lg2, 0.05,0.05,0.35,0.35, align_to = "full", clip = FALSE) +
   plot_annotation(
-    title = "Establishement and discontinuation of US post offices since 1800",
+    title = "Establishment and discontinuation of US post offices since 1780",
     caption = "Visualization: Christophe Nicault | Data: Cameron Blevins and Richard W. Helbock",
       theme = theme(
         plot.background = element_rect(fill = "grey50", color = NA),
