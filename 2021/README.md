@@ -8,6 +8,14 @@ Evolution of the number of movies and TV shows on Netflix
 
 ----
 
+## 2021 week 16 - US post offices
+
+Establishement and discontinuation of US post offices since 1800
+
+![Establishement and discontinuation of US post offices since 1800](/2021/2021-16-post_offices/post_offices.png)
+
+----
+
 ## 2021 week 15 - Global deforestation
 
 Annual changes in forest area over the years

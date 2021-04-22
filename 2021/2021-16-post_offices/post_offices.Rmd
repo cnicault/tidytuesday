@@ -1,0 +1,150 @@
+---
+title: "US post offices"
+author: "Christophe Nicault"
+date: "22/04/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r load_packages}
+
+library(tidyverse)
+library(patchwork)
+library(showtext)
+library(ggfx)
+
+font_add_google("Oswald", "oswald")
+font_add_google("Roboto Condensed", "roboto condensed")
+font_add_google("Share Tech Mono", "techmono")
+
+showtext_opts(dpi = 320)
+showtext_auto(enable = TRUE)
+
+```
+
+```{rload_data}
+
+post_offices <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-04-13/post_offices.csv')
+
+```
+
+```{r data_prep}
+
+post_clean <- post_offices %>%
+  replace_na(list(discontinued = 2022)) %>%
+  filter(established >= 1780 & established <= 2021) %>%
+  filter(discontinued >= 1780 & discontinued <= 2021) %>%
+  filter(established < discontinued)
+
+nb_post <- function(year){
+  
+  post_clean %>%
+    mutate(active = ifelse(year >= established & year <= discontinued, 1, 0)) %>%
+    summarise(nb_year = sum(active)) %>%
+    pull()
+}
+
+years <- seq(1780, 2021, 1)
+
+nb_active <- map_dbl(years, nb_post)
+
+active <- tibble(year = years,
+                 nb_active = nb_active)
+
+
+established <- post_clean %>%
+  group_by(established) %>%
+  summarise(nb_established = n())
+  
+discontinued <- post_clean %>%
+  group_by(discontinued) %>%
+  summarise(nb_discontinued = n())
+
+post_trend <- active %>%
+  left_join(established, by = c("year" = "established")) %>%
+  left_join(discontinued, by = c("year" = "discontinued")) %>%
+  replace_na(list(nb_established = 0, nb_discontinued = 0)) %>%
+  mutate(gap = nb_established - nb_discontinued)
+
+years <- tibble(year = c(seq(1800, 1890, 15), seq(1910, 2020, 15)),
+       y = c(rep(-150, 7), rep(150,8)))
+```
+
+```{r}
+blue <- "#1a7bc5"
+red <- "#f1434a"
+darkred <- "#8d0613"
+darkblue <- "#105182"
+```
+
+
+```{r plots}
+
+main <- ggplot() +
+  as_group(
+    geom_col(data = post_trend, aes(year, nb_established), fill = "#C4E4FA", width = 1),
+    geom_col(data = post_trend, aes(year, -nb_discontinued), fill = "#F4DCDD", width = 1),
+    geom_col(data = filter(post_trend, gap > 0), aes(year, gap), width = 1, fill = blue),
+    geom_col(data = filter(post_trend, gap < 0), aes(year, gap), width = 1, fill = red),
+    id = "group"
+  ) +
+    with_blend(
+    geom_text(data = years, aes(x = year, y = y, label = year), color = "white", family = "roboto condensed", fontface = "bold"),
+    bg_layer = "group",
+    blend_type = "xor"
+  )+
+  annotate("text", x = 1900, y = 0, label = "1900", angle = 45, color = "grey50", family = "roboto condensed", fontface = "bold", size = 5)+
+  geom_step(data = post_trend, aes(year-0.5, gap), color = "grey40")+
+  theme_void() +
+  theme(plot.background = element_rect(fill = "grey50", color = NA),
+        plot.margin = margin(10, 10, 50, 10))
+  
+lg1 <- ggplot() +
+  geom_col(data = post_trend, aes(year, nb_established), fill = "#C4E4FA", width = 1)+
+  geom_col(data = post_trend, aes(year, -nb_discontinued), fill = "#F4DCDD", width = 1) +
+  annotate("text", x = 1925, y = 2000, label = "Established", size = 5, color = "white", hjust = 0, family = "roboto condensed") +
+  annotate("text", x = 1925, y = -2400, label = "Discontinued", size = 5, color = "white", hjust = 0, family = "roboto condensed") +
+  scale_x_continuous(expand = c(0,0.5)) +
+  theme_void() +
+  theme(plot.background = element_rect(fill = "grey50", color = NA))
+
+lg2 <- ggplot() +
+  geom_col(data = filter(post_trend, gap > 0), aes(year, gap), width = 1, fill = blue) +
+  geom_col(data = filter(post_trend, gap < 0), aes(year, gap), width = 1, fill = red) +
+  geom_step(data = post_trend, aes(year-0.5, gap), color = "grey40", size = 0.2) +
+  annotate("text", x = 1800, y = 2100, label = "Net increase", size = 5, color = "white", hjust = 0, family = "roboto condensed") +
+  annotate("text", x = 1925, y = -2000, label = "Net decrease", size = 5, color = "white", hjust = 0, family = "roboto condensed") +
+  scale_x_continuous(expand = c(0,0.5)) +
+  theme_void() +
+  theme(plot.background = element_rect(fill = "grey50", color = NA))
+
+```
+
+```{r assemble}
+
+final <- main +
+  inset_element(lg1, 0.65,0.05,0.95,0.35, align_to = "full", clip = FALSE) +
+  inset_element(lg2, 0.05,0.05,0.35,0.35, align_to = "full", clip = FALSE) +
+  plot_annotation(
+    title = "Establishement and discontinuation of US post offices since 1800",
+    caption = "Visualization: Christophe Nicault | Data: Cameron Blevins and Richard W. Helbock",
+      theme = theme(
+        plot.background = element_rect(fill = "grey50", color = NA),
+        plot.title = element_text(family = "oswald", size = 20, color = "white", hjust = 0.5, face = "bold", margin = margin(10,0,0,0)),
+        plot.caption = element_text(family = "techmono", color = "white", size = 12, hjust = 0.98)      
+      )
+  )
+
+
+ragg::agg_png(here::here("render", paste0("post_offices_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")), res = 320, width = 14, height = 9, units = "in")
+
+final
+  
+dev.off()
+
+```
+
