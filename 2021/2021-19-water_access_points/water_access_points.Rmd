@@ -195,7 +195,7 @@ layout_title <- c(
 ((plot_spacer() +  inset_element(legend, 0.2,0.3,0.8,0.8, align_to = "full")) / ((plts[[1]] + plts[[2]]) / (plts[[3]] + plts[[4]]) + plot_layout(design = layout_map))) + plot_layout(design = layout_title) +
   plot_annotation(
     title = "Water access points distribution",
-    subtitle = str_wrap("African countries with the highest number of water access points. The donuts chart show the distribution by type of water source, the maps show their location.", 90),
+    subtitle = str_wrap("African countries with the highest number of water access points. The donut charts show the distribution by type of water source, the maps show their location.", 90),
     caption = "Visualization: Christophe Nicault | Data: Water Point Data Exchange WPDx",
     theme = theme(
       plot.background = element_blank(),
