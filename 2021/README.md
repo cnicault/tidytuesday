@@ -1,5 +1,13 @@
 # Tidy Tuesday data visualisation
 
+## 2021 week 19 - Water Access Points
+
+African countries with the highest number of water access points
+
+![African countries with the highest number of water access points](/2021/2021-19-water_access_points/water_access_points.png)
+
+----
+
 ## 2021 week 17 - Netflix Shows
 
 Evolution of the number of movies and TV shows on Netflix

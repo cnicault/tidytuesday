@@ -1,0 +1,212 @@
+---
+title: "Water Access Points"
+author: "Christophe Nicault"
+date: "10/05/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load_packages}
+
+library(tidytuesdayR)
+library(tidyverse)
+library(patchwork)
+library(lubridate)
+library(ggmap)
+library(ggfx)
+library(magick)
+library(showtext)
+
+font_add_google("Roboto", "roboto")
+font_add_google("Finger Paint", "finger paint")
+font_add_google("Share Tech Mono", "techmono")
+
+showtext_opts(dpi = 320)
+showtext_auto(enable = TRUE)
+
+```
+
+```{r load_data}
+
+tuesdata <- tidytuesdayR::tt_load(2021, week = 19)
+
+water <- tuesdata$water
+
+```
+
+```{r data_prep}
+
+water <-  water %>%
+  rename(country = country_name, source = water_source) %>%
+  filter(!is.na(country)) %>%
+  mutate(source = case_when(
+             str_detect(source, "Well") ~ "Well",
+             str_detect(source, "Spring") ~ "Spring",
+             str_detect(source, "Delivered") ~ "Delivered / Packaged Water",
+             str_detect(source, "Packaged") ~ "Delivered / Packaged Water",
+             is.na(source) ~ "Unkown",
+             TRUE ~ source
+    )
+  )
+
+water_sources <- water %>%
+  count(country, source) %>%
+  group_by(country) %>%
+  mutate(perc = n / sum(n)) %>%
+  ungroup() 
+
+top_countries <- water %>%
+  group_by(country) %>%
+  summarise(tot = n()) %>%
+  ungroup() %>%
+  slice_max(tot, n = 4) %>%
+  pull(country)
+
+source_keep <- water_sources %>%
+  filter(country %in% top_countries, perc > 0.1) %>%
+  group_by(source) %>%
+  slice_max(order_by = n, n = 5) %>%
+  distinct(source) %>%
+  pull()
+
+```
+
+```{r colors}
+
+pal <- c("Borehole" = "#0468BF", "Unkown" = "#ADB6B6", "Well" = "#049DBF", "Spring" = "#234025", "Rainwater Harvesting" = "#5E7330","Other" = "#8C4332") 
+
+```
+
+
+```{r donut_map_fct}
+
+water_cty <- function(country_sel){
+
+  ctr_shape <- map_data("world", regions = country_sel)
+  ctr_dim <- list(longmin = min(ctr_shape$long), longmax = max(ctr_shape$long), latmin = min(ctr_shape$lat), latmax = max(ctr_shape$lat))
+  
+  df <- water %>%
+  filter(country == country_sel,
+         between(lon_deg, ctr_dim$longmin, ctr_dim$longmax),
+                  between(lat_deg, ctr_dim$latmin, ctr_dim$latmax)
+         ) %>%
+    mutate(source = ifelse(source %in% source_keep, source, "Other"))
+  
+ bbox <- c(left = ctr_dim$longmin, bottom = ctr_dim$latmin, right = ctr_dim$longmax, top = ctr_dim$latmax)
+  
+ map_cty <- ggmap(get_stamenmap(bbox, maptype = "watercolor", zoom = 7, crop = TRUE), extent = "normal") +
+  geom_point(data = df, aes(lon_deg, lat_deg, color = source), alpha = 0.2, size = 0.4) +
+  as_reference(
+    borders("world", regions = country_sel, size = 2, fill = "black"),
+    id = "bck"
+  )+
+  with_blend(
+   annotate("rect", xmin = ctr_dim$longmin, xmax = ctr_dim$longmax, ymin = ctr_dim$latmin, ymax = ctr_dim$latmax, fill = "white", size = 0, color = "white"),
+    bg_layer = "bck",
+    blend_type = "xor"
+  )+
+  annotate("rect", xmin = ctr_dim$longmin, xmax = ctr_dim$longmax, ymin = ctr_dim$latmin, ymax = ctr_dim$latmax, size = 3, color = "white", fill = NA)+
+  scale_color_manual(values = pal) +
+  guides(color = FALSE)+
+  theme_void()+
+  theme(plot.margin = margin(80,80,80,80)) 
+ 
+ ragg::agg_png(here::here("render", "map_tmp.png"), res = 320, width = 10, height = 10, units = "in")
+ print(map_cty)
+ dev.off()
+ 
+ map_white <- image_read(here::here("render","map_tmp.png"))
+ map_transparent <- image_transparent(map_white, "white", fuzz = 3)
+ map_raster <- as.raster(map_transparent)
+
+  mapt<- ggplot()+
+  annotation_raster(map_raster,-Inf,Inf,-Inf,Inf)+
+  scale_x_continuous(limits = c(2,15))+
+  scale_y_continuous(limits = c(4,14))+
+  theme_void()
+
+  pd <- water_sources%>%
+  filter(country == country_sel) %>%
+  mutate(source = ifelse(source %in% source_keep, source, "Other")) %>%
+  ggplot(aes(5, perc, fill = source)) +
+  geom_col(position = "stack", alpha = 1) +
+  annotate("rect", xmin = 0, xmax = 4.5, ymin = 0, ymax = 1, fill = "#05C7F2")+
+  scale_fill_manual(values = pal) +
+  scale_x_continuous(limits = c(0,5.5), expand = c(0,0))+
+  coord_polar(theta = "y") +
+  labs(title = country_sel)+
+  guides(fill = FALSE)+
+  theme_void()+
+  theme(
+      plot.title = element_text(family = "finger paint", size = 24, color = "grey40", hjust = 0.5, face = "bold", margin = margin(0,0,-35,0)),
+    )
+    
+  final <- pd + inset_element(mapt,0.05,0.05,0.95,0.95, align_to = "panel")
+ 
+  final
+}
+
+```
+
+
+```{r legend}
+
+legend <- water_sources %>%
+  mutate(source = ifelse(source %in% source_keep, source, "Other"))%>%
+  filter(country %in% top_countries) %>%
+  ggplot(aes(fill = source)) +
+  geom_tile(aes(x =0, y=0, width =0, height = 0))+
+  scale_fill_manual(values = pal) +
+  guides(fill = guide_legend(label.position = "top",
+                               title.hjust = 0.5,
+                               keywidth = unit(6, "line"),
+                               keyheight = unit(1, "line"),
+                               nrow = 1
+                               )
+           )+
+  theme_void()+
+  theme(strip.text.x = element_text(family = "finger paint", face = "bold", size = 12, color = "black"),
+        plot.margin = margin(0,0,0,0),
+        panel.spacing = unit(0, "mm"),
+        legend.title = element_blank(),
+        legend.text = element_text(family = "finger paint", face = "bold", size = 12, color = "black"))
+  
+```
+
+```{r generate_final}
+
+plts <- lapply(top_countries, water_cty)
+
+ragg::agg_png(here::here("render", paste0("water_access_points_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")), res = 320, width = 10, height = 12, units = "in")
+
+layout_map <- c(
+  area(t = 1, l = 1, b = 5, r = 4),
+  area(t = 6, l = 1, b = 10, r = 4)
+)
+
+layout_title <- c(
+  area(t = 1, l = 1, b = 2, r = 4),
+  area(t = 3, l = 1, b = 15, r = 4)
+)
+
+((plot_spacer() +  inset_element(legend, 0.2,0.3,0.8,0.8, align_to = "full")) / ((plts[[1]] + plts[[2]]) / (plts[[3]] + plts[[4]]) + plot_layout(design = layout_map))) + plot_layout(design = layout_title) +
+  plot_annotation(
+    title = "Water access points distribution",
+    subtitle = str_wrap("African countries with the highest number of water access points. The donuts chart show the distribution by type of water source, the maps show their location.", 90),
+    caption = "Visualization: Christophe Nicault | Data: Water Point Data Exchange WPDx",
+    theme = theme(
+      plot.background = element_blank(),
+      plot.title = element_text(family = "finger paint", face = "bold", size = 22, color = "black", hjust = 0.5, margin = margin(5,0,10,0)),
+      plot.subtitle = element_text(family = "roboto", size = 14, color = "black", hjust = 0.5),
+      plot.caption = element_text(family = "techmono", color = "grey40", size = 11, hjust = 0.98)
+    )
+  )
+
+dev.off()
+
+```
+
+
