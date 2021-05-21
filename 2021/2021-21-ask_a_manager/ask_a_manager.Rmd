@@ -145,7 +145,7 @@ update_geom_defaults("text", list(family = "roboto condensed"))
 
 final <- ggplot(data = salary_industry)+
   geom_segment(aes(x = -0.5, xend = -2, y = index_ind, yend = index_ind), color = "grey50", linetype = "13")+
-  geom_label(aes(x = -0.5, y = index_ind, label = industry), hjust = 1, color = "grey90", label.size = 0, fill = "grey30", size = 4.5, family = "roboto condensed") +
+  geom_label(aes(x = -0.5, y = index_ind, label = industry), hjust = 1, color = "grey90", label.size = 0, fill = "grey20", size = 4.5, family = "roboto condensed") +
   geom_text(aes(x = 2.8, y = index_edu+10, label = education), hjust = 0, color = "grey90", size = 4.5) +
   geom_text(aes(x = 1.15, y = index+5, label = salary), color = "grey90", family = "oswald", size = 4.5) +
   geom_sigmoid(aes(x = -0.4, xend = 0.8, y = index_ind, yend = index+5, group = factor(group)), color = "grey40")+
@@ -173,7 +173,7 @@ final <- ggplot(data = salary_industry)+
        caption = " Visualization: Christophe Nicault | Data: Ask a Manager",
        color = "Average annual salary")+
   theme_void() +
-  theme(plot.background = element_rect(fill = "grey30", color = NA),
+  theme(plot.background = element_rect(fill = "grey20", color = NA),
         plot.title = element_text(family = "oswald", size = 20, color = "grey80", hjust = 0.5, face = "bold", margin = margin(10,0,0,0)),
         plot.caption = element_text(family = "techmono", color = "grey80", size = 12, hjust = 0.98, margin = margin(0,0,5,0)),
         legend.position = c(0.8, 0.13),
