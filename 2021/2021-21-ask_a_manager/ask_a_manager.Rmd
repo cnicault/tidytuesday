@@ -169,7 +169,7 @@ final <- ggplot(data = salary_industry)+
   guides(color = guide_colorbar(title.position = "top",
                                title.hjust = 0.5,
                                barwidth = 15)) +
-  labs(title = "Salary overview in the US by industry, eduction and gender gap",
+  labs(title = "Salary overview in the US by industry, education and gender gap",
        caption = " Visualization: Christophe Nicault | Data: Ask a Manager",
        color = "Average annual salary")+
   theme_void() +
