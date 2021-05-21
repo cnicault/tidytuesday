@@ -1,5 +1,13 @@
 # Tidy Tuesday data visualisation
 
+## 2021 week 21 - Ask A Manager
+
+Salary overview in the US by industry, eduction and gender gap
+
+![Salary overview in the US by industry, eduction and gender gap](/2021/2021-21-ask_a_manager/ask_manager.png)
+
+----
+
 ## 2021 week 19 - Water Access Points
 
 African countries with the highest number of water access points

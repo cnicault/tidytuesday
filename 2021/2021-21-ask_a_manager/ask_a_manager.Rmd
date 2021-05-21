@@ -1,0 +1,192 @@
+---
+title: "Ask a Manager"
+author: "Christophe Nicault"
+date: "21/05/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load_packages}
+
+library(tidytuesdayR)
+library(tidyverse)
+library(scales)
+library(glue)
+library(ggbump)
+library(showtext)
+
+font_add_google("Roboto Condensed", "roboto condensed")
+font_add_google("Oswald", "oswald")
+font_add_google("Share Tech Mono", "techmono")
+
+showtext_opts(dpi = 320)
+showtext_auto(enable = TRUE)
+
+```
+
+
+```{r load_data}
+
+survey <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-05-18/survey.csv')
+
+```
+
+
+```{r cleaning}
+
+# reorder the factors by 1st number found with parse number, then fct_relevel with one factor puts that one factor at the 1st position
+survey <- survey %>%
+  mutate(age = fct_relevel(fct_reorder(how_old_are_you, parse_number(how_old_are_you)), "under 18"),
+         overall_exp = fct_reorder(overall_years_of_professional_experience, parse_number(overall_years_of_professional_experience)),
+         field_exp = fct_reorder(years_of_experience_in_field, parse_number(years_of_experience_in_field))) %>%
+  select(-how_old_are_you, -overall_years_of_professional_experience, -years_of_experience_in_field)
+
+
+survey_clean <- survey %>%
+  filter(currency == "USD") %>%
+  mutate(industry = fct_lump_min(industry, 70, other_level = "Other")) %>%
+  filter(industry != "Other") %>%
+  filter(annual_salary < 1e6)
+
+```
+
+```{r sigmoid_data}
+
+salary_range <- survey_clean %>%
+  rename(education = highest_level_of_education_completed) %>%
+  group_by(industry, education) %>%
+  summarise(avg_salary = mean(annual_salary)) %>%
+  ungroup() %>%
+  mutate(salary = glue("{dollar(floor(avg_salary / 10000)*10000, accuracy = 1)} - {dollar(floor(avg_salary/10000)*10000 + 1e4, accuracy = 1)}"),
+         order = floor(avg_salary / 10000)*10000) %>%
+  filter(!is.na(education)) %>%
+  arrange(order)
+
+order_salary <- salary_range %>%
+  distinct(order) %>%
+  mutate(index = row_number())
+
+order_industry <- survey_clean %>%
+  group_by(industry) %>%
+  summarise(avg_salary = mean(annual_salary)) %>%
+  ungroup() %>%
+  arrange(avg_salary) %>%
+  distinct(industry) %>%
+  mutate(index_ind = row_number())
+
+order_education <- salary_range %>%
+  mutate(education = fct_relevel(education, c("High School", "Some college", "College degree", "Professional degree (MD, JD, etc.)", "Master's degree", "PhD"))) %>%
+  distinct(education) %>%
+  mutate(index_edu = as.numeric(education))
+
+salary_range <- salary_range %>%
+  left_join(order_salary) %>%
+  left_join(order_industry) %>%
+  left_join(order_education)
+
+salary_industry <- salary_range %>%
+  mutate(group = glue("{industry}-{salary}")) %>%
+  mutate(group2 = glue("{education}-{salary}"))
+
+```
+
+```{r summary_data}
+
+summary_industry <- survey_clean %>%
+  rename(education = highest_level_of_education_completed) %>%
+  group_by(industry) %>%
+  summarise(avg_salary = mean(annual_salary)) %>%
+  ungroup() %>%
+  mutate(salary = glue("{dollar(floor(avg_salary / 10000)*10000, accuracy = 1)} - {dollar(floor(avg_salary/10000)*10000 + 1e4, accuracy = 1)}"),
+         order = floor(avg_salary / 10000)*10000) %>%
+  arrange(order) %>%
+  left_join(order_industry) %>%
+  left_join(order_salary) %>%
+  mutate(group = glue("{index_ind}-{index}"))
+
+summary_education <- survey_clean %>%
+  rename(education = highest_level_of_education_completed) %>%
+  group_by(education) %>%
+  summarise(avg_salary = mean(annual_salary)) %>%
+  ungroup() %>%
+  mutate(salary = glue("{dollar(floor(avg_salary / 10000)*10000, accuracy = 1)} - {dollar(floor(avg_salary/10000)*10000 + 1e4, accuracy = 1)}"),
+         order = floor(avg_salary / 10000)*10000) %>%
+  filter(!is.na(education)) %>%
+  arrange(order) %>%
+  left_join(order_education) %>%
+  left_join(order_salary) %>%
+  mutate(group = glue("{index_edu}-{index}"))
+
+salary_gender <- survey_clean %>%
+  group_by(industry, gender) %>%
+  summarize(avg_salary = mean(annual_salary)) %>%
+  ungroup() %>%
+  pivot_wider(names_from = "gender", values_from = "avg_salary") %>%
+  mutate(gender_gap = abs(Man - Woman),
+         gender_scale = scales::rescale(gender_gap, to = c(0.1 , 0.6)),
+         gap_direction = ifelse(Man - Woman > 0, "Man", "Woman"),
+         gap_perc_m = Man / Woman) %>%
+  left_join(order_industry)
+
+```
+
+
+```{r plot}
+
+legend <- "The grey lines show all the possible salary range for each industries and education level. The colored lines show the average annual salary for each industry and each education level."
+
+woman_clr <- "#38D1B8"
+man_clr <- "#DBBE61"
+
+update_geom_defaults("text", list(family = "roboto condensed"))
+
+final <- ggplot(data = salary_industry)+
+  geom_segment(aes(x = -0.5, xend = -2, y = index_ind, yend = index_ind), color = "grey50", linetype = "13")+
+  geom_label(aes(x = -0.5, y = index_ind, label = industry), hjust = 1, color = "grey90", label.size = 0, fill = "grey30", size = 4.5, family = "roboto condensed") +
+  geom_text(aes(x = 2.8, y = index_edu+10, label = education), hjust = 0, color = "grey90", size = 4.5) +
+  geom_text(aes(x = 1.15, y = index+5, label = salary), color = "grey90", family = "oswald", size = 4.5) +
+  geom_sigmoid(aes(x = -0.4, xend = 0.8, y = index_ind, yend = index+5, group = factor(group)), color = "grey40")+
+  geom_sigmoid(aes(x = 1.5, xend = 2.7, y = index+5, yend = index_edu+10, group = factor(group2)), color = "grey40")+
+  geom_sigmoid(data = summary_industry, aes(x = -0.4, xend = 0.8, y = index_ind, yend = index+5, group = factor(group), color = avg_salary), size = 1, inherit.aes = FALSE) +
+  geom_point(data = summary_industry, aes(x = -0.4, y = index_ind, color = avg_salary), size = 2, inherit.aes = FALSE)+
+  geom_point(data = summary_industry, aes( x = 0.8, y = index+5, color = avg_salary), size = 2, inherit.aes = FALSE)+
+  geom_sigmoid(data = summary_education, aes(x = 1.5, xend = 2.7, y = index+5, yend = index_edu+10, group = factor(group), color = avg_salary), size = 1, inherit.aes = FALSE) +
+  geom_point(data = summary_education, aes(x = 1.5, y = index+5, color = avg_salary), size = 2, inherit.aes = FALSE) +
+  geom_point(data = summary_education, aes(x = 2.7, y = index_edu+10, color = avg_salary), size = 2, inherit.aes = FALSE) +
+  geom_segment(data = filter(salary_gender, gap_direction == "Woman"), aes(x = -2, xend = -2-gender_scale, y = index_ind-0.1, yend = index_ind-0.1), color = woman_clr, size = 4)+
+  geom_segment(data = filter(salary_gender, gap_direction == "Man"), aes(x = -2, xend = -2+gender_scale, y = index_ind-0.1, yend = index_ind-0.1), color = man_clr, size = 4)+
+  geom_text(data = filter(salary_gender, gap_direction == "Woman"), aes(x = -2, y = index_ind, label = dollar(gender_gap, accuracy = 1)), nudge_y = 0.3, color = woman_clr, hjust = 1.1) +
+  geom_text(data = filter(salary_gender, gap_direction == "Man"), aes(x = -2, y = index_ind, label = dollar(gender_gap, accuracy = 1)), nudge_y = 0.3, color = man_clr, hjust = -0.1) +
+  annotate("text", x = -2.2, y = 26, label = "Woman", color = woman_clr, size = 5)+
+  annotate("text", x = -1.8, y = 26, label = "Man", color = man_clr, size = 5) +
+  annotate("text", x = -2, y = 27, label = "Average gender gap", color = "grey80", size = 5, fontface = "bold") +
+  annotate("text", x = 1.2, y = 25, label = str_wrap(legend, 80), color = "grey80", hjust = 0, size = 5) +
+  scale_x_continuous(limits = c(-2.2,3.5)) +
+  scale_color_viridis_c(label = dollar_format()) +
+  guides(color = guide_colorbar(title.position = "top",
+                               title.hjust = 0.5,
+                               barwidth = 15)) +
+  labs(title = "Salary overview in the US by industry, eduction and gender gap",
+       caption = " Visualization: Christophe Nicault | Data: Ask a Manager",
+       color = "Average annual salary")+
+  theme_void() +
+  theme(plot.background = element_rect(fill = "grey30", color = NA),
+        plot.title = element_text(family = "oswald", size = 20, color = "grey80", hjust = 0.5, face = "bold", margin = margin(10,0,0,0)),
+        plot.caption = element_text(family = "techmono", color = "grey80", size = 12, hjust = 0.98, margin = margin(0,0,5,0)),
+        legend.position = c(0.8, 0.13),
+        legend.direction = "horizontal",
+        legend.title = element_text(size = 12, color = "grey80"),
+        legend.text = element_text(size = 10, color = "grey80"))
+
+
+ragg::agg_png(here::here("render", paste0("ask_manager_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")), res = 320, width = 17, height = 10, units = "in")
+
+final
+
+dev.off()
+
+```
+
