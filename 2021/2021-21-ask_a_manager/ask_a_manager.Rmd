@@ -160,8 +160,8 @@ final <- ggplot(data = salary_industry)+
   geom_segment(data = filter(salary_gender, gap_direction == "Man"), aes(x = -2, xend = -2+gender_scale, y = index_ind-0.1, yend = index_ind-0.1), color = man_clr, size = 4)+
   geom_text(data = filter(salary_gender, gap_direction == "Woman"), aes(x = -2, y = index_ind, label = dollar(gender_gap, accuracy = 1)), nudge_y = 0.3, color = woman_clr, hjust = 1.1) +
   geom_text(data = filter(salary_gender, gap_direction == "Man"), aes(x = -2, y = index_ind, label = dollar(gender_gap, accuracy = 1)), nudge_y = 0.3, color = man_clr, hjust = -0.1) +
-  annotate("text", x = -2.2, y = 26, label = "Woman", color = woman_clr, size = 5)+
-  annotate("text", x = -1.8, y = 26, label = "Man", color = man_clr, size = 5) +
+  annotate("text", x = -2.2, y = 26, label = "Women", color = woman_clr, size = 5)+
+  annotate("text", x = -1.8, y = 26, label = "Men", color = man_clr, size = 5) +
   annotate("text", x = -2, y = 27, label = "Average gender gap", color = "grey80", size = 5, fontface = "bold") +
   annotate("text", x = 1.2, y = 25, label = str_wrap(legend, 80), color = "grey80", hjust = 0, size = 5) +
   scale_x_continuous(limits = c(-2.2,3.5)) +
