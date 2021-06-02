@@ -1,0 +1,180 @@
+---
+title: "Survivor TV Show"
+author: "Christophe Nicault"
+date: "02/06/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r load_packages}
+
+library(tidytuesdayR)
+library(tidyverse)
+library(lubridate)
+library(patchwork)
+library(scales)
+library(ggbump)
+library(ggtext)
+library(showtext)
+
+font_add_google("Roboto", "roboto")
+font_add_google("Freckle Face", "freckle")
+font_add_google("Slackey", "slackey")
+font_add_google("Roboto Condensed", "roboto condensed")
+font_add_google("Oswald", "oswald")
+font_add_google("Share Tech Mono", "techmono")
+
+showtext_opts(dpi = 320)
+showtext_auto(enable = TRUE)
+
+```
+
+```{r load_data}
+
+viewers <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-06-01/viewers.csv')
+
+```
+
+```{r data_prep}
+
+view_stat <- viewers %>%
+  group_by(season) %>%
+  summarise(avg_ratings = mean(rating_18_49, na.rm = TRUE),
+            dev_ratings = sd(rating_18_49, na.rm = TRUE),
+            avg_view = mean(viewers, na.rm = TRUE),
+            dev_view = sd(viewers, na.rm = TRUE)) %>%
+  ungroup()
+
+viewers_gap <- viewers %>%
+  group_by(season) %>%
+  mutate(episode_type = case_when(
+    episode == 1 ~ "Premiere",
+    episode == max(episode) ~ "Finale",
+    TRUE ~ "other"
+  )) %>%
+  mutate(avg_viewers = mean(viewers, na.rm = TRUE),
+         avg_ratings = mean(rating_18_49, na.rm = TRUE)) %>%
+  ungroup() %>%
+  mutate(gap_viewers = viewers - avg_viewers,
+         gap_ratings = rating_18_49 - avg_ratings)
+
+```
+
+```{r customization}
+
+txt_col <- "white"
+
+
+arc_ratings <- viewers_gap %>%
+  filter(episode_type == "Finale", season >=24, season <40) %>%
+  select(xend = season, yend = rating_18_49, group = season)
+
+arc_viewers <- viewers_gap %>%
+  filter(episode_type == "Finale", season >=24, season <40) %>%
+  select(xend = season, yend = viewers, group = season)
+
+premiere <- "<span style='color:#F5F264'>premiere</span>"
+finale <- "<span style='color:#F59599'>finale</span>"
+average <- "<span style='color:#7EC9F5'>average</span>"
+nb_viewers <- "<span style='color:#7EC9F5'>number of viewers</span>"
+ratings <- "<span style='color:#7EC9F5'>ratings</span>"
+  
+text <- "Since the season 10, the number of viewers and the ratings (from viewers aged 18-49) have been declining. The {premiere} tend to be in the most viewed episodes and with the best ratings. The {finale} is often the worst in both rating and number of viewers, with a 15 seasons streak from season 24 to 39. The blue dots are the {nb_viewers} (top plot) or {ratings} (bottom plot) for each other episode, while the blue line represent the {average} of the season."
+
+text <- str_replace_all(str_wrap(text, 110), "\\n", "<br>")
+text <- glue::glue(text)
+
+axis_reviews <- tibble(x = rep(0, 6),
+                       y = seq(0, 50, 10),
+                       xend = c(40, 25, 11, 8, 2, 2),
+                       yend = seq(0, 50, 10))
+
+axis_ratings <- tibble(x = rep(0, 5),
+                       y = seq(0, 10, 2.5),
+                       xend = c(40, 25, 17, 17, 11),
+                       yend = seq(0, 10, 2.5))
+
+label_viewers <- "15 seasons streak where the finale is the episode with the less number of viewers of the season"
+label_viewers <- str_wrap(label_viewers, 50)
+
+label_ratings <- "15 seasons streak where the finale is the episode with the worst ratings of the season"
+label_ratings <- str_wrap(label_ratings, 50)
+
+```
+
+```{r viewers_plot}
+
+viewers_plt <- ggplot() +
+  geom_segment(data = axis_reviews, aes(x = x, y = y, xend = xend, yend = yend), linetype = "13", color = "grey60")+
+  geom_jitter(data = filter(viewers_gap, episode_type == "other"), aes(season, viewers), height =0, width = 0.1, size = 1.5, shape = 21, stroke = 0.3, alpha = 0.4, fill = "#7EC9F5", color = txt_col) +
+  geom_sigmoid(data =arc_viewers, aes(x = 31, y = 25, xend = xend, yend = max(yend), group = group), color = txt_col, direction = "y", linetype = "13") +
+  geom_segment(data =arc_viewers, aes(x = xend, y = yend, xend = xend, yend = max(yend)), color = txt_col, linetype = "13") +
+  geom_point(data = filter(viewers_gap, episode_type != "other"), aes(season, viewers, color = episode_type), size = 1.5) +
+  geom_step(data = view_stat, aes(season-0.5, avg_view), color = "grey80", size = 0.2) +
+  geom_segment(data = view_stat, aes(x=season-0.5, xend = season+0.5, y=avg_view, yend = avg_view), color = "#7EC9F5", size = 1) +
+  annotate("text", x = 31, y = 25, label = label_viewers, hjust = 0.5, color = txt_col, family = "roboto", size = 3, vjust = -0.2) +
+  annotate("text", x = 25, y = 50, label = "The curse of the survivor finales", size = 8, family = "slackey", color = txt_col) +
+  annotate("richtext", x = 12, y = 40, label = text, size = 3.5, family = "roboto condensed", color = "white", fill = NA, label.color = NA, hjust = 0) +
+  annotate("text", x = 19, y = 2, label = "# of viewers / season", color = "grey60", family = "oswald", size = 5, hjust = 0) +
+  annotate("segment", x = 18, xend = 18, y = 0, yend = 4, arrow = arrow(length = unit(2, "mm")), color = "grey60")+
+  scale_color_manual(values = c("Premiere" = "#F5F264", "Finale" = "#F59599")) +
+  scale_x_continuous(breaks = seq(1,39,2), expand = c(0,0)) +
+  scale_y_continuous(label = label_number(suffix = " M"), limits = c(0, 52))+
+  guides(color = FALSE) +
+  theme_void()+
+  theme(axis.text.x = element_text(family = "roboto condensed", size = 8, color = txt_col, margin = margin(6,0,1,0)),
+        axis.ticks.x = element_line(),
+        axis.text.y = element_text(family = "roboto condensed", size = 8, color = txt_col, margin = margin(0,5,0,0)),
+        axis.ticks.y = element_line())
+
+```
+
+```{r ratings_plot}
+
+ratings_plt <- ggplot() +
+  geom_segment(data = axis_ratings, aes(x = x, y = y, xend = xend, yend = yend), linetype = "13", color = "grey60")+
+  geom_jitter(data = filter(viewers_gap, episode_type == "other"), aes(season, rating_18_49), height =0, width = 0.1, size = 1.5, shape = 21, stroke = 0.3, alpha = 0.4, fill = "#7EC9F5", color = txt_col) +
+  geom_sigmoid(data =arc_ratings, aes(x = 31, y = 6, xend = xend, yend = max(yend), group = group), color = txt_col, direction = "y", linetype = "13") +
+  geom_segment(data =arc_ratings, aes(x = xend, y = yend, xend = xend, yend = max(yend)), color = txt_col, linetype = "13") +
+  geom_step(data = view_stat, aes(season-0.5, avg_ratings), color = "grey80", size = 0.2) +
+  geom_point(data = filter(viewers_gap, episode_type != "other"), aes(season, rating_18_49, color = episode_type)) +
+  geom_segment(data = view_stat, aes(x=season-0.5, xend = season+0.5, y=avg_ratings, yend = avg_ratings), color = "#7EC9F5", size = 1) +
+  annotate("text", x = 31, y = 6, label = label_ratings, hjust = 0.5, vjust = -0.2, color = txt_col, family = "roboto", size = 3) +
+  annotate("text", x = 19, y = 10, label = "Ratings / season", color = "grey60", family = "oswald", size = 5, hjust = 0) +
+  annotate("segment", x = 18, xend = 18, y = 10.2, yend = 9.4, arrow = arrow(length = unit(2, "mm")), color = "grey60")+
+  scale_x_continuous(position = "top", breaks = seq(2,40,2), expand = c(0,0)) +
+  scale_y_continuous(limits = c(0,10.2))+
+  scale_color_manual(values = c("Premiere" = "#F5F264", "Finale" = "#F59599")) +
+  guides(color = FALSE) +
+  theme_void()+
+  theme(axis.text.x = element_text(family = "roboto condensed", size = 8, color = txt_col, margin = margin(1,0,6,0)),
+        axis.ticks.x = element_line(),
+        axis.text.y = element_text(family = "roboto condensed", size = 8, color = txt_col, margin = margin(0,5,0,0)),
+        axis.ticks.y = element_line())
+
+```
+
+
+```{r final}
+
+final <- viewers_plt / ratings_plt + plot_annotation(
+  caption = "Visualization: Christophe Nicault | Data: survivoR Package / Daniel Oehm",
+  theme=theme(
+    plot.background = element_rect(fill = "grey20"),
+    plot.margin = margin(10,30,5,30),
+    plot.caption = element_text(family = "techmono", size = 9, color = txt_col)     
+  )
+)
+
+ragg::agg_png(here::here("render", paste0("survivor_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")), res = 320, width = 10, height = 10, units = "in")
+
+final
+
+dev.off()
+
+```
+

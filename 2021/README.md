@@ -1,5 +1,13 @@
 # Tidy Tuesday data visualisation
 
+## 2021 week 23 - Survivor TV show
+
+The visualization shows the decline of the number of viewers and of the rating of the survivor tv show over the seasons, and a 15 seasons streak with the finale as the worst episode.
+
+![The visualization shows the decline of the number of viewers and of the rating of the survivor tv show over the seasons, and a 15 seasons streak with the finale as the worst episode.](/2021/2021-23-survivor_tv_show/survivor.png)
+
+----
+
 ## 2021 week 21 - Ask A Manager
 
 Salary overview in the US by industry, education and gender gap
