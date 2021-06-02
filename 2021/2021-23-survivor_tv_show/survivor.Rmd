@@ -53,7 +53,7 @@ viewers_gap <- viewers %>%
   group_by(season) %>%
   mutate(episode_type = case_when(
     episode == 1 ~ "Premiere",
-    episode == max(episode) ~ "Finale",
+    episode == max(episode) ~ "Reunion",
     TRUE ~ "other"
   )) %>%
   mutate(avg_viewers = mean(viewers, na.rm = TRUE),
@@ -70,27 +70,27 @@ txt_col <- "white"
 
 
 arc_ratings <- viewers_gap %>%
-  filter(episode_type == "Finale", season >=24, season <40) %>%
+  filter(episode_type == "Reunion", season >=24, season <40) %>%
   select(xend = season, yend = rating_18_49, group = season)
 
 arc_viewers <- viewers_gap %>%
-  filter(episode_type == "Finale", season >=24, season <40) %>%
+  filter(episode_type == "Reunion", season >=24, season <40) %>%
   select(xend = season, yend = viewers, group = season)
 
 premiere <- "<span style='color:#F5F264'>premiere</span>"
-finale <- "<span style='color:#F59599'>finale</span>"
+reunion <- "<span style='color:#F59599'>reunion</span>"
 average <- "<span style='color:#7EC9F5'>average</span>"
 nb_viewers <- "<span style='color:#7EC9F5'>number of viewers</span>"
 ratings <- "<span style='color:#7EC9F5'>ratings</span>"
   
-text <- "Since the season 10, the number of viewers and the ratings (from viewers aged 18-49) have been declining. The {premiere} tend to be in the most viewed episodes and with the best ratings. The {finale} is often the worst in both rating and number of viewers, with a 15 seasons streak from season 24 to 39. The blue dots are the {nb_viewers} (top plot) or {ratings} (bottom plot) for each other episode, while the blue line represent the {average} of the season."
+text <- "Since the season 10, the number of viewers and the ratings (from viewers aged 18-49) have been declining. The {premiere} tend to be in the most viewed episodes and with the best ratings. The {reunion} is often the worst episode, in both rating and number of viewers, with a 15 seasons streak from season 24 to 39. The blue dots are the {nb_viewers} (top plot) or {ratings} (bottom plot) for each other episode, while the blue line represents the {average} of the season."
 
 text <- str_replace_all(str_wrap(text, 110), "\\n", "<br>")
 text <- glue::glue(text)
 
 axis_reviews <- tibble(x = rep(0, 6),
                        y = seq(0, 50, 10),
-                       xend = c(40, 25, 11, 8, 2, 2),
+                       xend = c(40, 25, 11, 8, 3, 3),
                        yend = seq(0, 50, 10))
 
 axis_ratings <- tibble(x = rep(0, 5),
@@ -98,10 +98,10 @@ axis_ratings <- tibble(x = rep(0, 5),
                        xend = c(40, 25, 17, 17, 11),
                        yend = seq(0, 10, 2.5))
 
-label_viewers <- "15 seasons streak where the finale is the episode with the less number of viewers of the season"
+label_viewers <- "15 seasons streak where the reunion is the episode with the less number of viewers of the season"
 label_viewers <- str_wrap(label_viewers, 50)
 
-label_ratings <- "15 seasons streak where the finale is the episode with the worst ratings of the season"
+label_ratings <- "15 seasons streak where the reunion is the episode with the worst ratings of the season"
 label_ratings <- str_wrap(label_ratings, 50)
 
 ```
@@ -117,11 +117,11 @@ viewers_plt <- ggplot() +
   geom_step(data = view_stat, aes(season-0.5, avg_view), color = "grey80", size = 0.2) +
   geom_segment(data = view_stat, aes(x=season-0.5, xend = season+0.5, y=avg_view, yend = avg_view), color = "#7EC9F5", size = 1) +
   annotate("text", x = 31, y = 25, label = label_viewers, hjust = 0.5, color = txt_col, family = "roboto", size = 3, vjust = -0.2) +
-  annotate("text", x = 25, y = 50, label = "The curse of the survivor finales", size = 8, family = "slackey", color = txt_col) +
+  annotate("text", x = 25, y = 50, label = "The curse of the survivor reunions", size = 8, family = "slackey", color = txt_col) +
   annotate("richtext", x = 12, y = 40, label = text, size = 3.5, family = "roboto condensed", color = "white", fill = NA, label.color = NA, hjust = 0) +
   annotate("text", x = 19, y = 2, label = "# of viewers / season", color = "grey60", family = "oswald", size = 5, hjust = 0) +
   annotate("segment", x = 18, xend = 18, y = 0, yend = 4, arrow = arrow(length = unit(2, "mm")), color = "grey60")+
-  scale_color_manual(values = c("Premiere" = "#F5F264", "Finale" = "#F59599")) +
+  scale_color_manual(values = c("Premiere" = "#F5F264", "Reunion" = "#F59599")) +
   scale_x_continuous(breaks = seq(1,39,2), expand = c(0,0)) +
   scale_y_continuous(label = label_number(suffix = " M"), limits = c(0, 52))+
   guides(color = FALSE) +
@@ -148,7 +148,7 @@ ratings_plt <- ggplot() +
   annotate("segment", x = 18, xend = 18, y = 10.2, yend = 9.4, arrow = arrow(length = unit(2, "mm")), color = "grey60")+
   scale_x_continuous(position = "top", breaks = seq(2,40,2), expand = c(0,0)) +
   scale_y_continuous(limits = c(0,10.2))+
-  scale_color_manual(values = c("Premiere" = "#F5F264", "Finale" = "#F59599")) +
+  scale_color_manual(values = c("Premiere" = "#F5F264", "Reunion" = "#F59599")) +
   guides(color = FALSE) +
   theme_void()+
   theme(axis.text.x = element_text(family = "roboto condensed", size = 8, color = txt_col, margin = margin(1,0,6,0)),
