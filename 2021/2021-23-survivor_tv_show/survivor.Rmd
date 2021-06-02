@@ -164,7 +164,7 @@ ratings_plt <- ggplot() +
 final <- viewers_plt / ratings_plt + plot_annotation(
   caption = "Visualization: Christophe Nicault | Data: survivoR Package / Daniel Oehm",
   theme=theme(
-    plot.background = element_rect(fill = "grey20"),
+    plot.background = element_rect(fill = "grey20", color = NA),
     plot.margin = margin(10,30,5,30),
     plot.caption = element_text(family = "techmono", size = 9, color = txt_col)     
   )
