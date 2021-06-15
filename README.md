@@ -1,5 +1,13 @@
 # Tidy Tuesday data visualisation
 
+## 2021 week 25 - #DuBoisChallenge tweets
+
+The visualization shows the 10 top tweets for the #DuBoisChallenge
+
+![The visualization shows the number of likes, retweets and quotes for the 10 top tweets, in the style of Du Bois, with bars that goes back for the highest values](/2021/2021-25-DuBoisChallenge_tweets/dubois_tweets.png)
+
+----
+
 ## 2021 week 23 - Survivor TV show
 
 The visualization shows the decline of the number of viewers and of the rating of the survivor tv show over the seasons, and a 15 seasons streak with the finale as the worst episode.

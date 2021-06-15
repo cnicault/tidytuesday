@@ -1,0 +1,122 @@
+---
+title: '#DuBoisChallenge tweets'
+author: "Christophe Nicault"
+date: "15/06/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r load_packages}
+
+library(tidytuesdayR)
+library(tidyverse)
+library(showtext)
+
+font_add_google("Rajdhani", "rajdhani")
+font_add_google("Changa", "changa")
+
+showtext_opts(dpi = 320)
+showtext_auto(enable = TRUE)
+
+```
+
+```{r load_data}
+
+tuesdata <- tidytuesdayR::tt_load(2021, week = 25)
+
+tweets <- tuesdata$tweets
+
+tweets <- tweets %>%
+  filter(!if_any(contains("count"), is.na))
+
+```
+
+```{r data_prepation}
+
+cut_point <- 292.5
+rayon <- 15 / pi
+
+df <- tweets %>%
+  slice_max(like_count, n = 10) %>%
+  select(username, contains("count")) %>%
+  rowwise() %>%
+  mutate(total = sum(c_across(contains("count")))) %>%
+  ungroup() %>%
+  arrange(like_count) %>%
+  mutate(username = fct_reorder(username, total, .desc = FALSE),
+         high = ifelse(total > cut_point, 1, 0),
+         space = ifelse(!is.na(lag(high)), lag(high), 0),
+         position = row_number()*20 + space * 10) %>%
+  select(-high, -space) %>%
+  pivot_longer(cols = -c(username, total, position)) %>%
+  mutate(circle = ifelse(value > cut_point, 1, 0),
+         segment2 = ifelse(value > cut_point, value-cut_point-rayon, 0),
+         segment = ifelse(value > cut_point, cut_point, value)) %>%
+  mutate(name = str_to_title(str_remove(name, "_count")),
+         name = fct_relevel(name, c("Like", "Retweet", "Quote"))) %>%
+  group_by(username) %>%
+  arrange(value) %>%
+  mutate(posy = position + row_number() * 5) %>%
+  ungroup()
+
+username <- df %>% distinct(username, position)
+
+
+y <- seq(-rayon, rayon, 0.1)
+
+circle_x <- function(y, r){
+  sqrt(r^2 - (y)^2)
+}
+
+circle_init <- tibble(x = circle_x(y, rayon),
+       y = y)
+
+circles <- df %>%
+  filter(circle != 0) %>%
+  select(posy) %>%
+  mutate(data = map(posy, function(shift) {circle_init %>% mutate(y = y + shift, x = x + cut_point, group = shift)})) %>%
+  unnest(data)
+
+```
+
+```{r plot}
+
+final <- df %>%
+  ggplot() +
+  geom_segment(aes(x = 0, xend = segment, y = posy, yend = posy, color = name), size = 5) +
+  geom_segment(aes(x = cut_point, xend = cut_point - segment2, y = posy + 2*rayon, yend = posy + 2*rayon, color = name), size = 5) +
+  geom_path(data = circles, aes(x = x, y = y + rayon, group = group), size = 5, color = "#4682b4", lineend = "round") +
+  geom_text(data = username, aes(-8, position + 15, label = str_squish(username)), family = "rajdhani", hjust = 1, vjust = 1, inherit.aes = FALSE) +
+  geom_text(aes(x = 10, y = posy, label = value), size = 3, family = "rajdhani", hjust = 1) +
+  scale_color_manual(values = c("Like" = "#4682b4", "Retweet" = "#ffd700", "Quote" = "#dc143c")) +
+  guides(color = guide_legend(label.position = "top",
+                             title.hjust = 0.5,
+                             keywidth = unit(4, "line"),
+                             keyheight = unit(1, "line"),
+                             nrow = 1
+                             )
+         )+
+  labs(title = "10 top tweets about the #DuBoisChallenge",
+       subtitle = "in the style of Du Bois",
+       caption =  "Visualization: Christophe Nicault | Data: Anthony Starks, Allen Hillery & Sekou Tyler") +
+  theme_void() +
+  theme(plot.background = element_rect(fill = "#E4D7C8", color = NA),
+        legend.position = c(0.8, 0.2),
+        legend.title = element_blank(),
+        plot.title = element_text(family = "changa", size = 20, hjust = 0.5, margin = margin(15,0,0,0)),
+        plot.subtitle = element_text(family = "changa", size = 14, hjust = 0.5, margin = margin(15,0,15,0)),
+        plot.caption = element_text(family = "rajdhani", size = 10, hjust = 0.98, margin = margin(0,0,5,0)))
+  
+
+ragg::agg_png(here::here("render", paste0("dubois_tweets_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")), res = 320, width = 12, height = 8, units = "in")
+
+final
+
+dev.off()
+
+```
+
