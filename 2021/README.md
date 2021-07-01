@@ -1,5 +1,13 @@
 # Tidy Tuesday data visualisation
 
+## 2021 week 27 - Animal Rescues
+
+Animal rescues by London fire brigade between 2019 & 2020
+
+![The visualisation shows the rise in animal rescued between 2019 and 2020, the year of the pandemic. The rise is mainly due to cats and birds in dwelling, other animals and property categories are stable. The yearly notional cost went from £240897 to £ 305611, i.e. 26.9% increase.](/2021/2021-27-animal_rescues/animal_rescues.png)
+
+----
+
 ## 2021 week 25 - #DuBoisChallenge tweets
 
 The visualization shows the 10 top tweets for the #DuBoisChallenge

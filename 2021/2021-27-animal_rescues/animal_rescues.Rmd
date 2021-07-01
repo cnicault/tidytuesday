@@ -1,0 +1,171 @@
+---
+title: "Animal rescues"
+author: "Christophe Nicault"
+date: "01/07/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r load_packages}
+
+library(tidyverse)
+library(tidytuesdayR)
+library(lubridate)
+library(scales)
+library(ggimage)
+library(ggbump)
+library(ggtext)
+library(showtext)
+
+font_add_google("Roboto", "roboto")
+font_add_google("Roboto Condensed", "roboto condensed")
+font_add_google("Oswald", "oswald")
+font_add_google("Share Tech Mono", "techmono")
+
+showtext_opts(dpi = 320)
+showtext_auto(enable = TRUE)
+
+```
+
+
+```{r load_data}
+
+tuesdata <- tidytuesdayR::tt_load(2021, week = 27)
+
+animal_rescues <- tuesdata$animal_rescues
+
+```
+
+```{r data_preparation}
+
+ar_clean <- animal_rescues %>%
+  mutate(across(matches("cost|pump|itude"), as.numeric),
+         date_call = dmy_hm(date_time_of_call),
+         day_call = wday(date_call),
+         month_call = month(date_call),
+         hour_call = hour(date_call),
+         year_call = year(date_call),
+         animal_group_parent = str_to_title(animal_group_parent),
+         animal = fct_lump(animal_group_parent, 5)) 
+
+
+ar_wide <- ar_clean %>%
+  filter(year_call >= 2019 & year_call <= 2020) %>%
+  filter(property_category %in% c("Dwelling", "Outdoor")) %>%
+  select(year_call, animal, property_category) %>%
+  count(year_call, animal, property_category) %>%
+  mutate(year_call = paste0("y", year_call)) %>%
+  pivot_wider(id_cols = c(animal, property_category), names_from = year_call, values_from = n) %>%
+  mutate(diff = y2020 - y2019,
+         perc = y2020 / y2019 - 1, 
+         sign = ifelse(diff < 0, "neg", "pos"))
+
+cost <- ar_clean %>%
+  filter(year_call >= 2019 & year_call <= 2020) %>%
+  select(year_call, animal, pump_hours_total, incident_notional_cost) %>%
+  group_by(year_call, animal) %>%
+  summarise(total_hours = sum(pump_hours_total, na.rm = TRUE),
+            total_cost = sum(incident_notional_cost, na.rm = TRUE)) %>%
+  pivot_wider(id_cols = animal, names_from = year_call, values_from = c(total_hours, total_cost)) %>%
+  mutate(posy = 6 - as.numeric(animal),
+         perc = total_cost_2020 / total_cost_2019 - 1,
+         sign2020 = ifelse(perc > 0, "pos", "neg"),
+         sign2019 = ifelse(perc < 0, "pos", "neg"),
+         offset = ifelse(perc > 0, 0.15, -0.15),
+         angle = ifelse(perc > 0, 15, -12),
+         proportion = total_cost_2020 / sum(total_cost_2020),
+         poscol = proportion / 2 + rev(cumsum(rev(lead(proportion, default = 0)))))
+
+images <- ar_wide %>%
+  distinct(animal) %>%
+  mutate(posy = 6 - as.numeric(animal),
+         image_path = here::here("2021", "2021-27-animal_rescues","images", glue::glue("{animal}.png"))) %>%
+  left_join(select(cost, animal, offset)) 
+
+```
+
+
+```{r plot_variables}
+
+update_geom_defaults("text", list(family = "roboto condensed"))
+
+pal <- c("Bird" = "#818C30", "Cat" = "#64732F", "Dog" = "#C4DDF2", "Fox" = "#6F9ABF", "Horse" = "#3264A6", "Other" = "#6C8CB5")
+  
+axis <- tibble(x = seq(0,250,50), 250)
+
+
+text1 <- "Evolution of the number of calls for each species between 2019 ---- and 2020 between Dwelling (above line) and Outdoor (below line)"
+
+text2 <- "Notional cost"
+
+subtitle <- glue::glue("The number of animal rescued rise by 20% overall during the pandemic, mainly due to birds and cats in dwelling. The cost went from {dollar(sum(cost$total_cost_2019), prefix = '£')} in 2019 to {dollar(sum(cost$total_cost_2020), prefix = '£')} in 2020, for animal rescued in dwelling and outdoor, i.e. 26.9% increase in cost.")
+
+bck_clr <- "#EBDDC0"
+pos_clr <-"#A62D2D"
+neg_clr <- "#49868C"
+sep_clr <- "#C29E44"
+
+```
+
+```{r final_plot}
+
+final <- ar_wide %>%
+  mutate(posy = 6 - as.numeric(animal),
+         shifty = ifelse(property_category == "Dwelling", 0.15, -0.15),
+         posy_shift = posy + shifty) %>%
+  ggplot()+
+  # main plot
+  geom_segment(data = axis, aes(x = x, xend = x, y = -0.25, yend = 5.5), linetype = "15", size = 0.3) +
+  geom_text(data = axis, aes(x = x, y = -0.5, label = x)) +
+  geom_image(data = images, aes(x = -35, y = posy, image = image_path), size = 0.05, asp = 12/6)+
+  geom_segment(aes(x = y2019, xend = y2020, y = posy_shift, yend = posy_shift, color = sign), size = 3) +  
+  geom_point(aes(y2019, posy_shift, color = sign), shape = 21, fill = "white", size = 4, stroke = 1) +
+  geom_point(aes(y2020, posy_shift, color = sign, fill = sign), shape = 21, size = 4, stroke = 1)  +
+  # separation dwelling & outdoor
+  geom_segment(aes(x = 0, xend = 250, y = posy, yend = posy), size = 0.5, color = sep_clr) +
+  annotate("text", x = 245, y = 5, label = "Dwelling", hjust = 1, vjust = -0.3, family = "oswald", size = 6, fontface = "bold", color = sep_clr) +
+  annotate("text", x = 245, y = 5, label = "Outdoor", hjust = 1, vjust = 1.2, family = "oswald", size = 6, fontface = "bold", color = sep_clr) +
+  # cost plot
+  geom_text(data = cost, aes(x = 330, y = posy - offset, label = dollar(total_cost_2019, prefix = "£")), hjust = 1.1) +
+  geom_text(data = cost, aes(x = 380, y = posy + offset, label = dollar(total_cost_2020, prefix = "£"), color = sign2020), hjust = -0.1, fontface = "bold") +
+  geom_text(data = cost, aes(x = 355, y = posy, label = percent(perc), angle = angle), hjust = 0.5, vjust = -0.3, size = 3.5) +
+  geom_segment(data = cost, aes(x = 330, xend = 380, y = posy - offset, yend = posy + offset), arrow = arrow(length = unit(2, "mm"))) +
+  # breakdown by species ploy
+  geom_sigmoid(data = cost, aes(x = 420, xend = 520, y = posy + offset, yend = poscol * 5 , group = animal), color = "grey60") +
+  geom_image(data = images, aes(x = 435, y = posy + offset + 0.2, image = image_path), size = 0.03, asp = 12/6)+  
+  geom_col(data = cost, aes(x = 540, y = proportion * 5, fill = animal), width = 30) +
+  geom_text(data = cost, aes( x = 540, y = poscol * 5, label = percent(proportion))) +
+  # text annotations
+  annotate("text", x = 0, y = 6, label = str_wrap(text1, 80), hjust = 0) +
+  annotate("point", x = 203, y = 6.13, shape = 21, size = 4, stroke = 1, fill = "white") +
+  annotate("point", x = 244, y = 6.13, shape = 21, size = 4, stroke = 1, fill = "grey60") +
+  annotate("text", x = 350, y = 6.1, label = text2, hjust = 0.5, vjust = 0) +
+  annotate("text", x = 320, y = 5.8, label = "2019", hjust = 1, vjust = 0) +
+  annotate("text", x = 385, y = 5.8, label = "2020", hjust = 0, vjust = 0) +
+  scale_x_continuous(limits = c(-50, 560)) +
+  scale_color_manual(values = c("neg" = neg_clr, "pos" = pos_clr))+
+  scale_fill_manual(values = c(pal, "neg" = "#9FBFC2", "pos" = pos_clr)) +
+  guides(color = FALSE, fill = FALSE, text = FALSE) +
+  labs(title = "Animal rescues by London fire brigade in Dwelling & Outdoor",
+       subtitle = str_wrap(subtitle, 150),
+       caption = "Visualization: Christophe Nicault | Data: London.gov") +
+  theme_void() +
+  theme(plot.background = element_rect(fill = bck_clr, color = NA),
+        plot.title = element_text(family = "oswald", size = 18, face = "bold", hjust = 0.5, margin = margin(15, 0, 0, 0)),
+        plot.subtitle = element_text(family = "oswald", size = 14, hjust = 0.5, margin = margin(15, 0, 25, 0), lineheight = 1.2),
+        plot.caption = element_text(family = "techmono", size = 10, hjust = 0.98, margin = margin(15,0,5,0))
+        )
+
+ragg::agg_png(here::here("render", paste0("animal_rescues_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")), res = 320, width = 13, height = 8, units = "in")
+
+final
+
+dev.off()
+
+```
+
+
