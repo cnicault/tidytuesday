@@ -104,7 +104,7 @@ text2 <- "Notional cost"
 
 subtitle <- glue::glue("The number of animal rescued rise by 20% overall during the pandemic, mainly due to birds and cats in dwelling. The cost went from {dollar(sum(cost$total_cost_2019), prefix = '£')} in 2019 to {dollar(sum(cost$total_cost_2020), prefix = '£')} in 2020, for animal rescued in dwelling and outdoor, i.e. 26.9% increase in cost.")
 
-bck_clr <- "#EBDDC0"
+bck_clr <- "#FDF7EB"
 pos_clr <-"#A62D2D"
 neg_clr <- "#49868C"
 sep_clr <- "#C29E44"
@@ -130,8 +130,8 @@ final <- ar_wide %>%
   annotate("text", x = 245, y = 5, label = "Dwelling", hjust = 1, vjust = -0.3, family = "oswald", size = 6, fontface = "bold", color = sep_clr) +
   annotate("text", x = 245, y = 5, label = "Outdoor", hjust = 1, vjust = 1.2, family = "oswald", size = 6, fontface = "bold", color = sep_clr) +
   # cost plot
-  geom_text(data = cost, aes(x = 330, y = posy - offset, label = dollar(total_cost_2019, prefix = "£")), hjust = 1.1) +
-  geom_text(data = cost, aes(x = 380, y = posy + offset, label = dollar(total_cost_2020, prefix = "£"), color = sign2020), hjust = -0.1, fontface = "bold") +
+  geom_text(data = cost, aes(x = 325, y = posy - offset, label = dollar(total_cost_2019, prefix = "£")), hjust = 1) +
+  geom_text(data = cost, aes(x = 413, y = posy + offset, label = dollar(total_cost_2020, prefix = "£"), color = sign2020), hjust = 1, fontface = "bold") +
   geom_text(data = cost, aes(x = 355, y = posy, label = percent(perc), angle = angle), hjust = 0.5, vjust = -0.3, size = 3.5) +
   geom_segment(data = cost, aes(x = 330, xend = 380, y = posy - offset, yend = posy + offset), arrow = arrow(length = unit(2, "mm"))) +
   # breakdown by species ploy
@@ -143,9 +143,9 @@ final <- ar_wide %>%
   annotate("text", x = 0, y = 6, label = str_wrap(text1, 80), hjust = 0) +
   annotate("point", x = 203, y = 6.13, shape = 21, size = 4, stroke = 1, fill = "white") +
   annotate("point", x = 244, y = 6.13, shape = 21, size = 4, stroke = 1, fill = "grey60") +
-  annotate("text", x = 350, y = 6.1, label = text2, hjust = 0.5, vjust = 0) +
-  annotate("text", x = 320, y = 5.8, label = "2019", hjust = 1, vjust = 0) +
-  annotate("text", x = 385, y = 5.8, label = "2020", hjust = 0, vjust = 0) +
+  annotate("text", x = 355, y = 6.1, label = text2, hjust = 0.5, vjust = 0, fontface = "bold") +
+  annotate("text", x = 320, y = 5.8, label = "2019", hjust = 1, vjust = 0, fontface = "bold") +
+  annotate("text", x = 390, y = 5.8, label = "2020", hjust = 0, vjust = 0, fontface = "bold") +
   scale_x_continuous(limits = c(-50, 560)) +
   scale_color_manual(values = c("neg" = neg_clr, "pos" = pos_clr))+
   scale_fill_manual(values = c(pal, "neg" = "#9FBFC2", "pos" = pos_clr)) +
