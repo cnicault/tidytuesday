@@ -1,0 +1,260 @@
+---
+title: "Independence Days"
+author: "Christophe Nicault"
+date: "07/07/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load_packages}
+
+library(tidyverse)
+library(lubridate)
+library(ggbump)
+library(patchwork)
+library(showtext)
+
+font_add_google("Allura", "allura")
+font_add_google("Roboto", "roboto")
+font_add_google("Oswald", "oswald")
+font_add_google("Lobster", "lobster")
+font_add_google("Share Tech Mono", "techmono")
+
+showtext_opts(dpi = 320)
+showtext_auto(enable = TRUE)
+
+```
+
+```{r load_data}
+
+holidays <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-07-06/holidays.csv')
+
+```
+
+```{r recode_country}
+
+#setdiff(holidays$country, unique(map_data("world")$region))
+# recode the countries that have different names between the holiday data and the map data
+
+countries <- tribble(
+  ~country, ~map_country,
+  "Antigua and Barbuda"	,	"Antigua"	,
+  "Bahamas, The"	,	"Bahamas"	,
+  "China, People's Republic of"	,	"China"	,
+  "China, Republic of"	,	"China"	,
+  "Congo, Democratic Republic of the"	,	"Republic of Congo"	,
+  "Congo, Republic of the"	,	"Republic of Congo"	,
+  "East Timor"	,	"Timor-Leste"	,
+  "Eswatini"	,	"Swaziland"	,
+  "Gambia, The"	,	"Gambia"	,
+  "Netherlands, The"	,	"Netherlands"	,
+  "North Macedonia"	,	"Macedonia"	,
+  "Saint Kitts and Nevis"	,	"Saint Kitts"	,
+  "Saint Vincent and the Grenadines"	,	"Saint Vincent"	,
+  "São Tomé and Príncipe"	,	"Sao Tome and Principe"	,
+  "Trinidad and Tobago"	,	"Trinidad"	,
+  "United States"	,	"USA"	,
+  "Vatican City"	,	"Vatican"	,
+)
+
+
+```
+
+```{r data_preparation}
+
+holidays <- holidays %>%
+  left_join(countries, by = "country") %>%
+  mutate(map_country = ifelse(is.na(map_country), country, map_country),
+         independence_from = case_when(
+           grepl("France|French", independence_from) ~ "France",
+           grepl("Great Britain|United Kingdom", independence_from) ~ "United Kingdom",
+           grepl("Spain|Spanish", independence_from) ~ "Spain",
+           TRUE ~ independence_from
+           ),
+         country = str_remove(country, ", The")
+        )
+
+
+colonies <- holidays %>%
+  filter(independence_from %in% c("United Kingdom", "France", "Spain")) %>%
+  select(country, map_country, date_parsed, independence_from)
+
+# Create new records for countries that are two separate island in map_data
+
+new_region <- colonies %>%
+  filter(map_country %in%  c("Trinidad", "Saint Vincent", "Saint Kitts")) %>%
+  mutate(map_country = case_when(
+    grepl("Trinidad", map_country) ~ "Tobago",
+    grepl("Vincent", map_country) ~ "Grenadines",
+    grepl("Kitts", map_country) ~ "Nevis",
+  ))
+
+colonies_info <- colonies %>%
+  bind_rows(new_region)
+
+world_map <- map_data("world") %>%
+  filter(region != "Antarctica") %>%
+  as_tibble()  %>%
+  left_join(colonies_info, by = c("region" = "map_country"))
+
+```
+
+
+```{r colors}
+
+sea_clr <- "#3ED5F7"
+
+pal <- c("United Kingdom" = "#8C0712", "France" = "#15638C", "Spain" = "#4D665A")
+
+```
+
+```{r maps}
+
+# Maps
+caribbean_map <- world_map %>%
+  mutate(region_filter = countrycode::countrycode(region, origin = "country.name", destination ="region23")) %>%
+  filter(region_filter == "Caribbean") %>%
+  ggplot() +
+  geom_polygon(aes(x = long, y = lat, group = group, fill = independence_from), color = "grey40", size = 0.1)  +
+  scale_fill_manual(values = pal, na.value = "grey70") +
+  scale_color_manual(values = pal, na.value = "grey70") +  
+  guides(fill = FALSE)+
+  theme_void() +
+  theme(plot.background = element_rect(fill = sea_clr, color = "#A65208", size = 2))
+
+colonies_map <- world_map %>%
+  ggplot() +
+  geom_polygon(aes(x = long, y = lat, group = group, fill = independence_from), color = "grey40", size = 0.2)  +
+  annotate("segment", x = -70, y = 19, xend = -140, yend = -5, size = 0.2, color = "grey40")+
+  scale_fill_manual(values = pal, na.value = "grey70") +
+  scale_color_manual(values = pal, na.value = "grey70") +  
+  guides(fill = FALSE) +
+  theme_void() +
+  theme(plot.background = element_rect(fill = sea_clr, color = "#A65208", size = 4))
+
+```
+
+
+```{r timeline_before_20}
+
+# timeline for before 20th century
+years_break16 <- tibble(year = seq(ymd("1600-01-01"), ymd("1900-01-01"), "50 year"))
+
+time_before20 <- holidays %>%
+  filter(!is.na(independence_from)) %>%
+  filter(independence_from %in% c("United Kingdom", "France", "Spain")) %>%
+  filter(date_parsed < ymd("1900-01-01")) %>%
+  filter(date_parsed != ymd("1809-08-10")) %>%  # Keep only the last date for Ecuador
+  arrange(date_parsed) %>% 
+  mutate(pos = row_number(),
+         pos_year = scales::rescale(row_number(), from = c(1, n()),to = c(min(year(date_parsed)), max(year(date_parsed)))),
+         posy = as.Date(date_decimal(pos_year))) %>% 
+  ggplot() +
+  annotate("rect", xmin = -0.4, xmax = 0.4, ymin = ymd("1580-01-01"), ymax = ymd("1910-01-01"), fill = "#BF6E0B")+
+  geom_segment(aes(x = -0.4, xend = 0.4, y = date_parsed, yend = date_parsed), color = "#403C06") +
+  geom_text(data=years_break16, aes(x = 0, y = year, label = year(year)), color = "#E3C896", family = "oswald", fontface = "bold") +
+  geom_text(aes(x = 2, y = posy, label = glue::glue("{country} - {date_parsed}"), color = independence_from), hjust = 0, family = "roboto") +
+  geom_sigmoid(aes(x = 2, xend = 0.4, y = posy, yend = date_parsed, group = country, color = independence_from), direction = "x", size = 0.2) +
+  scale_x_continuous(limits = c(-1,6)) +
+  scale_fill_manual(values = pal) +
+  scale_color_manual(values = pal) +  
+  guides(color = FALSE) +
+  theme_void() +
+  labs(title = "Independence before 1900") +
+  theme(plot.title = element_text(family = "allura", size = 26, hjust = 0.5, margin = margin(20,0,0,0)))
+
+```
+
+
+```{r timeline_after_20}
+
+# timeline for the 20th century
+holidays_20 <- holidays %>%
+  filter(!is.na(independence_from)) %>%
+  filter(independence_from %in% c("United Kingdom", "France", "Spain")) %>%
+  filter(date_parsed > ymd("1900-01-01")) %>%
+  arrange(date_parsed) %>%
+  mutate(pos = row_number(),
+         pos_x = ifelse(row_number() %% 2 == 0, -2, 2),
+         offset = ifelse(row_number() %% 2 == 0, -0.4, 0.4),
+         hjust = ifelse(row_number() %% 2 == 0, 1, 0),
+  ) %>%
+  group_by(pos_x) %>%
+  mutate(pos_year = scales::rescale(row_number(), from = c(1, n()),to = c(min(year(date_parsed)), max(year(date_parsed)))),
+         posy = as.Date(date_decimal(pos_year)),
+         group = glue::glue("{country}-{pos}"),
+         country_label = ifelse(pos_x == 0, glue::glue("{country} - {date_parsed}"), glue::glue("{date_parsed} - {country}"))) %>%
+  ungroup()
+
+years_break20 <- tibble(year = seq(ymd("1920-01-01"), ymd("1980-01-01"), "10 year"))
+
+time_after20 <-holidays_20 %>%
+  ggplot() +
+    annotate("rect", xmin = -0.4, xmax = 0.4, ymin = ymd("1915-01-01"), ymax = ymd("1986-01-01"), fill = "#BF6E0B")+
+    geom_segment(aes(x = -0.4, xend = 0.4, y = date_parsed, yend = date_parsed), color = "#403C06") +
+    geom_text(aes(x = pos_x, y = posy, label = country_label, color = independence_from, hjust = hjust), family = "roboto") +
+    geom_sigmoid(aes(x = pos_x, xend = offset, y = posy, yend = date_parsed, group = group, color = independence_from), direction = "x", size = 0.2) +
+    geom_text(data=years_break20, aes(x = 0, y = year, label = year(year)), color = "#E3C896", family = "oswald", fontface = "bold") +
+    scale_fill_manual(values = pal) +
+    scale_color_manual(values = pal) +
+    scale_x_continuous(limits = c(-6.7,8)) +
+    guides(color = FALSE) +
+  theme_void() +
+  labs(title = "Independence in the 20th century") +
+  theme(plot.title = element_text(family = "allura", size = 26, hjust = 0.8, margin = margin(20,0,0,0)))
+
+```
+
+
+```{r legend}
+
+legend_df <-tibble(pos = c(1, 3, 5),
+             country = c("United Kingdom", "France", "Spain"))
+
+legend <- legend_df %>%
+  ggplot() +
+  geom_rect(aes(xmin = pos, xmax = pos+1, ymin =0, ymax = 0.3, fill = country), size = 6) +
+  geom_text(aes(x = pos+0.5, y = 0.5, label = country, color = country), size = 6, hjust = 0.5, vjust = 0) +
+  scale_fill_manual(values = pal) +
+  scale_color_manual(values = pal) +
+  scale_y_continuous(limits = c(0,1)) +
+  scale_x_continuous(limits = c(0,7)) +
+  guides(color = FALSE, fill = FALSE) +
+  theme_void()
+
+```
+
+
+```{r final}
+
+# use plot_spacer() with inset_element() for the map to have a margin on both side without impacting the margin on the
+# two plots below. Couldn't find a better option, if I set a margin on the map, than the panel of the plot below align to 
+# the panel of the map creating a wide margin.
+
+final <- { {plot_spacer() + theme(plot.background = element_rect(fill = "#ffffff", color = NA)) + 
+    inset_element(colonies_map, 0.15, 0, 0.85, 1)  + inset_element(caribbean_map, 0.157, 0.020, 0.35, 0.4, align_to = "panel")}  / legend / {(time_before20 | time_after20) + plot_layout(width = c(1,2))} +
+  plot_layout(heights = c(3, 0.5, 6), guides = "auto")} +
+  plot_annotation(
+    title = "Independence days of countries colonized by the 3 major colonizers",
+    subtitle = "The United Kingdom had 58 former colonies, France 31 and Spain 22.",
+    caption = "Visualization: Christophe Nicault | Data: Wikipedia / Isabella Velasquez",
+    theme = theme(
+    plot.background = element_rect(fill = "#ffffff"),
+    plot.title = element_text(family = "lobster", size = 30, face = "bold", hjust = 0.5, margin = margin(20,0,0,0)),
+    plot.subtitle = element_text(family = "allura", size = 26, hjust = 0.5, margin = margin(10,0,0,0)),
+    plot.caption = element_text(family = "techmono", size = 12, hjust = 0.98, margin = margin(5,0,5,0))
+    )
+  )
+
+
+ragg::agg_png(here::here("render", paste0("independence_days_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")), res = 320, width = 12, height = 16, units = "in")
+
+final
+
+dev.off()
+
+```
+

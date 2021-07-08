@@ -1,5 +1,13 @@
 # Tidy Tuesday data visualisation
 
+## 2021 week 28 - Independence days
+
+Independence days of countries colonized by the 3 major colonizers
+
+![Independence days of countries colonized by the 3 major colonizers, the visualization shows a map with the former colonies of the United Kingdom, France and Spain. There is a timeline showing the independence days of all these former colonies, The United Kingdom had 58 former colonies, France 31 and Spain 22. ](/2021/2021-28-independence_days/independence_days.png)
+
+----
+
 ## 2021 week 27 - Animal Rescues
 
 Animal rescues by London fire brigade between 2019 & 2020
