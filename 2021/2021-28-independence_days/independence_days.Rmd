@@ -63,14 +63,26 @@ countries <- tribble(
 
 ```
 
+```{r}
+holidays %>%  mutate(country_map = case_when(
+           grepl("France|French", independence_from) ~ "France",
+           grepl("Great Britain|United Kingdom", independence_from) & !grepl("Portugal", independence_from) ~ "United Kingdom",
+           grepl("Spain|Spanish", independence_from) ~ "Spain",
+           TRUE ~ independence_from
+           ),
+         country = str_remove(country, ", The")) %>%
+  select(country, independence_from, country_map) %>% View()
+```
+
+
 ```{r data_preparation}
 
 holidays <- holidays %>%
   left_join(countries, by = "country") %>%
   mutate(map_country = ifelse(is.na(map_country), country, map_country),
          independence_from = case_when(
-           grepl("France|French", independence_from) ~ "France",
-           grepl("Great Britain|United Kingdom", independence_from) ~ "United Kingdom",
+           grepl("France|French", independence_from) & !grepl("Allied", independence_from) ~ "France",
+           grepl("Great Britain|United Kingdom", independence_from) & !grepl("Portugal|Allied", independence_from) ~ "United Kingdom",
            grepl("Spain|Spanish", independence_from) ~ "Spain",
            TRUE ~ independence_from
            ),
@@ -238,8 +250,10 @@ final <- { {plot_spacer() + theme(plot.background = element_rect(fill = "#ffffff
     inset_element(colonies_map, 0.15, 0, 0.85, 1)  + inset_element(caribbean_map, 0.157, 0.020, 0.35, 0.4, align_to = "panel")}  / legend / {(time_before20 | time_after20) + plot_layout(width = c(1,2))} +
   plot_layout(heights = c(3, 0.5, 6), guides = "auto")} +
   plot_annotation(
-    title = "Independence days of countries colonized by the 3 major colonizers",
-    subtitle = "The United Kingdom had 58 former colonies, France 31 and Spain 22.",
+    # title = "Independence days of countries colonized by the 3 major colonizers",
+    # subtitle = "The United Kingdom had 58 former colonies, France 31 and Spain 22 who celebrate an independence day.",
+    title = "Countries celebrating independence from the 3 major colonizers",
+    subtitle = "The United Kingdom had 57 former colonies, France 30 and Spain 22 with an independence day.",
     caption = "Visualization: Christophe Nicault | Data: Wikipedia / Isabella Velasquez",
     theme = theme(
     plot.background = element_rect(fill = "#ffffff"),
