@@ -1,5 +1,13 @@
 # Tidy Tuesday data visualisation
 
+## 2021 week 30 - US droughts
+
+Evolution of droughts in the US over the last 20 years
+
+![The graph shows the evolution of droughts in all US state from 2001 to 2021.  The western and southern states are the most impacted with 80 to 100% of the last 20 years with droughts. The droughts are also more severe in the west with many period with extreme or exceptional droughts which rarely happen in the east, where the droughts range from abnormally dry to severe droughts and were impacted between 27 to 67% of the time depending on the states.](/2021/2021-30-US_droughts/us_droughts.png)
+
+----
+
 ## 2021 week 28 - Independence days
 
 Independence days of countries colonized by the 3 major colonizers

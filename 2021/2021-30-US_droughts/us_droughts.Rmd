@@ -1,0 +1,158 @@
+---
+title: "US droughts"
+author: "Christophe Nicault"
+date: "20/07/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load_packages}
+
+library(tidyverse)
+library(lubridate)
+library(geofacet)
+library(cowplot)
+library(showtext)
+
+
+font_add_google("Roboto", "roboto")
+font_add_google("Roboto Condensed", "roboto condensed")
+font_add_google("Oswald", "oswald")
+font_add_google("Share Tech Mono", "techmono")
+
+showtext_opts(dpi = 320)
+showtext_auto(enable = TRUE)
+
+```
+
+```{r load_data}
+
+drought <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-07-20/drought.csv')
+
+```
+
+```{r data_prep}
+
+drought <- drought %>%
+  mutate(year = year(valid_start),
+         drought_lvl = fct_recode(drought_lvl,"Abnormally dry" = "D0","Moderate drought" = "D1","Severe drought" = "D2", "Extreme drought" = "D3","Exceptional drought" = "D4"))
+
+state.abb <- c(state.abb, "DC", "PR")
+state.name <- c(state.name, "District of Columbia", "Puerto Rico")
+
+pct_nodrought <- drought %>%
+  filter(drought_lvl == "None") %>% 
+  mutate(nod = ifelse(area_pct == 100, 1, 0)) %>%
+  group_by(state_abb) %>%
+  summarise(pct_no = mean(nod, na.rm = TRUE),
+            tot_day = sum(nod) * 6) %>%
+  ungroup() %>%
+  mutate(state_name = map_chr(state_abb, function(x) state.name[which(state.abb == x)]))
+
+
+drought_week <- drought %>%
+  filter(drought_lvl != "None") %>% 
+  group_by(state_abb, drought_lvl) %>%
+  summarise(pct = sum(area_pct != 0) / n()) %>%
+  ungroup()
+
+
+drought_scale <- tibble(x = c(ymd("20260101"), rep(ymd("20250101"), 5)),
+               xend = c(ymd("20260101"), rep(ymd("20260601"), 5)),
+               y = c(0, seq(0,100,25)),
+               yend = c(100,seq(0,100,25)))
+
+drought_axis <- drought %>%
+  distinct(state_abb) %>%
+  mutate(coord = list(drought_scale)) %>%
+  unnest(coord)
+
+```
+
+```{r main_plot}
+
+txt_clr <- "white"
+
+final <- drought %>%
+  filter(drought_lvl != "None", area_pct > 0) %>% 
+  ggplot(aes(valid_start, area_pct,fill = drought_lvl))+
+  geom_col(position = "identity", width = 6) +
+  # percentage of drought bar
+  geom_segment(data = drought_axis, aes(x = x, xend = xend, y = y, yend = yend), color = txt_clr, inherit.aes = FALSE) +
+  geom_col(data = drought_week, aes(ymd("20250101"), y = pct*100, fill = drought_lvl), width = 2*365, inherit.aes = FALSE, position = "identity") +
+  geom_text(data = pct_nodrought, aes(x = ymd("2026-06-01"), y = -10, label = scales::percent(1-pct_no, accuracy = 1 )), size = 3, fontface = "bold", inherit.aes = FALSE, hjust = 1, family = "roboto condensed", color = txt_clr) + 
+  # weeks with drought
+  geom_rect(aes(xmin = valid_start, xmax = valid_start + 6, ymin = -15, ymax = -5), fill = "grey80", inherit.aes = FALSE) +  
+  # weeks with drought
+  geom_text(data = pct_nodrought, aes(x = ymd("2012-01-01"), y = 115, label = state_name), size = 3.5, family = "roboto", fontface = "bold", color= txt_clr, inherit.aes = FALSE) +
+
+  scale_fill_brewer(palette = "OrRd")+
+  scale_y_continuous(limits = c(-15, 120)) +
+  facet_geo(~state_abb, grid = "us_state_with_DC_PR_grid2") +  # include DC and Puerto Rico
+  guides(fill = guide_legend(label.position = "top",
+                             title.hjust = 0.5,
+                             keywidth = unit(7, "line"),
+                             keyheight = unit(1, "line"),
+                             nrow = 1
+                             )
+       )+
+  labs(title = "Evolution of droughts in the US over the last 20 years",
+       subtitle = "from July 2001 to July 2021",
+       caption = "Visualization: Christophe Nicault | Data: Drought Monitor")+
+  theme_void()+
+  theme(panel.spacing = unit(1,"mm"),
+        plot.margin = margin(10,30,10,30),
+        plot.background = element_rect(fill = "grey30", color = "grey30"),
+        legend.position = "bottom",
+        legend.text = element_text(color = txt_clr, family = "roboto condensed", face = "bold", size = 12, margin = margin(20,0,0,0)),
+        legend.title = element_blank(),
+        plot.title = element_text(family = "oswald", size = 20, face = "bold", hjust = 0.55, color = txt_clr, margin = margin(15, 0, 0, 0)),
+        plot.subtitle = element_text(family = "oswald", size = 16, hjust = 0.5, color = txt_clr, margin = margin(15, 0, 25, 0), lineheight = 1.2),
+        plot.caption = element_text(family = "techmono", size = 12, hjust = 0.98, color = txt_clr, margin = margin(15,0,5,0)),
+        strip.text = element_blank()
+        )
+
+
+```
+
+```{r legend}
+
+legend <- drought %>%
+  filter(drought_lvl != "None", area_pct > 0, state_abb == "MO") %>% 
+  ggplot(aes(valid_start, area_pct, fill = drought_lvl))+
+  geom_col(position = "identity", width = 6) +
+  # percentage of drought bar
+  geom_segment(data = filter(drought_axis, state_abb == "MO"), aes(x = x, xend = xend, y = y, yend = yend), color = txt_clr, inherit.aes = FALSE) +
+  geom_col(data = filter(drought_week, state_abb == "MO"), aes(ymd("20250101"), y = pct*100, fill = drought_lvl), width = 2*365, inherit.aes = FALSE, position = "identity") +
+  geom_text(data = filter(pct_nodrought, state_abb == "MO"), aes(x = ymd("2026-06-01"), y = -10, label = scales::percent(1-pct_no, accuracy = 1 )), size = 3, fontface = "bold", inherit.aes = FALSE, hjust = 1, family = "roboto condensed", color = "white") +
+  # weeks with drought
+  geom_rect(aes(xmin = valid_start, xmax = valid_start + 6, ymin = -15, ymax = -5), fill = "grey80", inherit.aes = FALSE) +  
+  # Legend annotations
+  annotate("text", x = ymd("20330101"), -40, label = "Weeks with drought", hjust = 0, color = txt_clr, size = 4) +
+  annotate("curve", x = ymd("20150601"), xend = ymd("20320101"), y = -20, yend = -40, color = txt_clr, arrow = arrow(length = unit(2, "mm"), ends = "first"), curvature = 0.1)+  
+  annotate("text", x = ymd("20330101"), 76, label = str_wrap("% of time with drought during the last 20 years", 30), hjust = 0, color = txt_clr, size = 4) +
+    annotate("segment", x = ymd("20270701"), xend = ymd("20320101"), y = 76, yend = 76, color = txt_clr, arrow = arrow(length = unit(2, "mm"), ends = "first"))+
+annotate("curve", x = ymd("20270701"), xend = ymd("20400101"), y = -10, yend = 50, color = txt_clr, arrow = arrow(length = unit(2, "mm"), ends = "first"), curvature = 0.4)+  
+  annotate("text", x = ymd("20010101"), 150, label = "Evolution of the percentage of area of the state with drought", hjust = 0, color = txt_clr, size = 4) +
+    annotate("curve", x = ymd("20100701"), xend = ymd("20050101"), y = 100, yend = 130, color = txt_clr, arrow = arrow(length = unit(2, "mm"), ends = "first"), curvature = -0.2)+  
+  scale_fill_brewer(palette = "OrRd") +
+  scale_x_continuous(limits = c(ymd("20010101", "20800101")))+
+  scale_y_continuous(limits = c(-45,160))+
+  guides(fill = FALSE) +
+  theme_void()
+
+```
+
+```{r save}
+
+ragg::agg_png(here::here("render", paste0("us_droughts_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")), res = 320, width = 18, height = 12, units = "in")
+
+ggdraw(final) + draw_plot(legend, x = 0.05, y = 0.81, width = 0.3, height = 0.17)
+  
+dev.off()
+
+```
+
