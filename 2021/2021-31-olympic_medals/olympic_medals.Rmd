@@ -1,0 +1,179 @@
+---
+title: "Olympic medals"
+author: "Christophe Nicault"
+date: "29/07/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r load_packages}
+
+library(tidyverse)
+library(glue)
+library(showtext)
+
+
+font_add_google("Roboto", "roboto")
+font_add_google("Share Tech Mono", "techmono")
+font_add_google("Brygada 1918", "brygada1918")
+
+showtext_opts(dpi = 320)
+showtext_auto(enable = TRUE)
+```
+
+
+```{r load_data}
+
+olympics <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-07-27/olympics.csv')
+
+```
+
+
+```{r data_prep}
+
+# Countries entering the game for the first time
+enter_game <- olympics %>%
+  filter(season == "Summer") %>%
+  group_by(noc) %>%
+  summarise(first_year = min(year)) %>%
+  ungroup() %>%
+  group_by(first_year) %>%
+  summarise(enter_game = glue_collapse(noc, sep = "\n"),
+            nb_ctr = n()) %>%
+  ungroup()
+
+# total of medal for each year per country
+medal_year_country <- olympics %>%
+  filter(season == "Summer", year != 1906) %>%
+  filter(!is.na(medal)) %>%
+  group_by(year, noc) %>%
+  distinct(event, medal) %>%
+  summarise(total = n(),
+            gold = sum(medal == "Gold"),
+            silver = sum(medal == "Silver"),
+            bronze = sum(medal == "Bronze")) %>%
+  ungroup()
+
+# total number of country participating each year
+nb_ctry_year <- olympics %>%
+  filter(season == "Summer") %>%
+  group_by(noc) %>%
+  mutate(first_year = min(year)) %>%
+  ungroup() %>%
+  distinct(noc, games, year, first_year) %>%
+  mutate(new = ifelse(first_year == year, "New participant", "Participated before"),
+         new = fct_relevel(new, "Participated before","New participant")) %>%
+  count(year, new, name = "nb_ctry") 
+
+# summary to use in top 3 country list to position the labels
+nb_ctry_join <- nb_ctry_year %>%
+  group_by(year) %>%
+  summarise(total = sum(nb_ctry))
+
+# List of top 3 countries for each year
+medal_year <- medal_year_country %>%
+  group_by(year) %>%
+  arrange(desc(gold), desc(total)) %>%
+  slice_head(n = 3)%>%
+  summarise(rank = glue_collapse(noc, sep = "\n")) %>%
+  ungroup() %>%
+  left_join(nb_ctry_join, by = "year") %>%
+  mutate(posy = ifelse(total > 20, total - 2, total + 2),
+         vjust = ifelse(total > 20, 1, 0))
+
+```
+
+```{r text_arrows}
+
+history <- tibble(year = c(1916, 1942, 1968, 1972, 1990, 1906),
+                  y = c(55, 75, 160, 200, 240, 120),
+                  hjust = c(0.5,0.5,1,1,1, 0.5),
+                  title = c("World War I", "World War II", "African boycott", "Boycott of Russian games", "Ex-USSR countries", "1906 Olympic Intercalated Games"),
+                  full_text = c("", "", "Boycott of 29 countries led by Tanzania to protest against the participation of New Zealand whose rugby teams had played in Apartheid South Africa", "Boycott of 65 counties led by USA to protest against the soviet invasion of Afghanistan by USSR","First participation of ex-soviet countries who competed as unified team in 1992 (EUN)", "The Intercalated Games in Ahtnes were part of a new schedule. The medals are not officially recognized by the Olympic Committee. 20 countries participated including 4 new countries."))
+
+label_segment <- tibble(x = c(1969, 1973, 1984, 1969.5,1973.5, 1900),
+                        xend = c(1969,1973, 1990, 1974, 1976, 1912),
+                        y = c(160,200, 208, 140, 185, 75),
+                        yend = c(125,170, 208, 140, 185, 75))
+
+
+label_arrows <- tibble(x = c(1974,1976, 1988, 1906, 1906),
+                       xend = c(1976,1980, 1993.5, 1906, 1906),
+                       y = c(140,185,205, 72, -55),
+                       yend = c(105,100, 185, 30, -25))
+
+years <- seq(1896,2016, 4)
+years <- years[!years %in% c(1916, 1940, 1944)]
+games <- tibble(year = years)
+
+legend <- "The National Olympic Committees (NOC) below the bars are the NOC entering the Summer Olympic Game for the first time that year. The NOC above are the 3 top NOC who won the most gold medals."
+
+axis_segment <- tibble(x = rep(2019,9),
+                       xend = rep(2022,9),
+                       y = seq(0,200,25),
+                       yend = seq(0,200,25))
+
+```
+
+```{r plot}
+
+update_geom_defaults("segment", list(color = "white"))
+update_geom_defaults("text", list(family = "brygada1918", color = "white", lineheight = 1))
+
+final <- ggplot() +
+  # y axis
+  geom_segment(data = axis_segment, aes(x=x, xend = xend, y = y,  yend = yend), linetype = "13") +
+  geom_text(data = axis_segment, aes(x = x, y = y, label = y), nudge_x = 1.5, nudge_y = 5, size = 3.5, color = "grey80", fontface = "bold") +
+  # x axis
+    geom_text(data = games, aes(x = year, y = -8, label = year), vjust = 0, size = 3.5) +
+  # bars
+  geom_col(data = filter(nb_ctry_year, year != 1906) ,aes( x = year, y = nb_ctry, fill = new)) +
+  # new countries
+  geom_text(data = filter(enter_game, first_year != 1906), aes(x = first_year, y = -12, label = enter_game), vjust = 1, size = 3, color = "#F2B705", fontface = "bold") +
+  # history text
+  geom_text(data= history, aes(x = year, y = y, label = title, hjust = hjust), vjust = 1, size = 4, fontface = "bold") +
+  geom_text(data= history, aes(x = year, y = y-10, label = str_wrap(full_text,40), hjust = hjust), vjust = 1, family = "roboto", size = 3) +
+  # labels arrows
+  geom_segment(data = label_segment, aes(x=x, xend = xend, y = y,  yend = yend)) +
+  geom_segment(data = label_arrows, aes(x=x, xend = xend, y = y,  yend = yend), arrow = arrow(length = unit(2, "mm"))) + 
+  # Top 3 countries
+  geom_text(data= medal_year, aes(x = year, y = posy, label = rank, vjust = vjust), size = 3, fontface = "bold") +
+  # 1906
+  annotate("text", x = 1906, y = -60, label = "1906", size = 3.5, lineheight = 1) +
+    geom_text(data = filter(enter_game, first_year == 1906), aes(x = first_year, y = -66, label = enter_game), vjust = 1, size = 3, color = "#F2B705", fontface = "bold") +
+  # Title and legend
+  annotate("text", x = 1922, y = 235, label = "History of National Olympic Committees\n participating in the Olympic Summer Games", size = 9, color = "#F29F05") +
+  annotate("text", x = 1908, y = -165, label = str_wrap(legend, 60), size = 4, hjust = 0) +  
+  scale_x_continuous(limits = c(1892, 2023), labels = years, breaks = years) +
+  scale_y_continuous(limits = c(-180, 250)) +
+  scale_fill_manual(values = c("Participated before" = "#70735D", "New participant" = "#F28705"))+
+  guides(fill = guide_legend(label.position = "right",
+                           title.hjust = 0.5,
+                           keywidth = unit(2, "line"),
+                           keyheight = unit(2, "line"),
+                           nrow = 2
+                           )
+     )+
+  theme_void()+
+  labs(
+       caption = "Visualization: Christophe Nicault | Data: www.sports-reference.com / Kaggle")+
+  theme(plot.background = element_rect(fill = "grey20"),
+        legend.position = c(0.55,0.08),
+        legend.text = element_text(color = "white", family = "brygada1918", face = "bold", size = 12, vjust = 0.5),
+        legend.title = element_blank(),
+        plot.caption = element_text(family = "techmono", size = 12, hjust = 0.98, color = "grey80", margin = margin(15,0,5,0)),
+        )
+
+
+ragg::agg_png(here::here("render", paste0("olympic_medals_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")), res = 320, width = 16, height = 10, units = "in")
+
+final
+  
+dev.off()
+
+```
+

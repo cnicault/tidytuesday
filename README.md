@@ -1,5 +1,13 @@
 # Tidy Tuesday data visualisation
 
+## 2021 week 31 - Olympic history
+
+History of National Olympic Committees participating in the Olympic Summer Games
+
+![The graph shows the history of national committees participatning in modern Olympic Games, and the impact of some events, like the world war 1 and 2, and the African boycott of the 1976 games, the boycott of the Russian games in 1980 and the increase in the number of countries due to the ex-soviet countries..](/2021/2021-31-olympic_medals/olympic_medals.png)
+
+----
+
 ## 2021 week 30 - US droughts
 
 Evolution of droughts in the US over the last 20 years
