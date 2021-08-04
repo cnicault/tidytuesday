@@ -1,0 +1,211 @@
+---
+title: "Paralympic Medals - Trischa Zorn"
+author: "Christophe Nicault"
+date: "04/08/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r load_packages}
+
+library(tidyverse)
+library(glue)
+library(tidytext)
+library(packcircles)
+library(showtext)
+
+font_add_google("Roboto", "roboto")
+font_add_google("Roboto Condensed", "roboto condensed")
+font_add_google("Oswald", "oswald")
+font_add_google("Share Tech Mono", "techmono")
+
+showtext_opts(dpi = 320)
+showtext_auto(enable = TRUE)
+
+```
+
+source :
+https://en.wikipedia.org/wiki/Trischa_Zorn
+
+```{r load_data}
+
+zorn_raw <- vroom::vroom(here::here("2021", "2021-32-paralympic_medals","trischa_zorn.csv"), col_names = FALSE)
+colnames(zorn_raw) <- c("medal", "games", "event")
+
+zorn_medal <- zorn_raw %>%
+  separate(games, sep = " ", into = c("year", "city"), extra = "merge") %>%
+  mutate(class = str_extract(event, pattern = "\\s[A-Z]{1,2}[0-9]+.*$|B$|A-B$"),
+         event = str_remove(event, pattern = "\\s[A-Z]{1,2}[0-9]+.*$|B$|A-B$"),
+         event = str_squish(event),
+         year = as.numeric(year),
+         medal = str_extract(medal, "\\w+"),
+         medal = fct_relevel(medal, "Bronze", "Silver", "Gold"),
+         posy = as.numeric(medal))
+```
+
+
+```{r pool_design}
+
+# Darker lines
+lines <- tibble(x = rep(1978,3),
+                xend = rep(2006,3),
+                y = seq(1,3,1),
+                yend = seq(1,3,1))
+
+cosw <- function(x){return(cos((x-1980)*pi/4)/8 + 4)}
+
+# waves
+waves <- tibble(x = seq(1976, 2008, 0.2),
+                y = cosw(x),
+                yback = cosw(x + 3))
+
+# segment to draw the tiles
+segment_tile_x <- tibble(x = seq(1976,2008,0.5))
+segment_tile_y <- tibble(y = seq(0.5,3.5,0.1))
+
+# floating line
+float_line <- tibble(x = rep(seq(1976, 2007, 1),2),
+                     y = sort(rep(seq(1.5,2.5,1), 32)))
+
+```
+
+
+
+```{r data_preparation}
+
+# Games list
+games <- zorn_medal %>%
+  distinct(year, city) %>%
+  mutate(posy = cosw(year),
+         posy_year = ifelse(posy < 4, 3.75, 4),
+         posy_city = ifelse(posy < 4, 3.55, 3.8))
+
+# event list with medals
+events <- zorn_medal %>%
+  group_by(year) %>%
+  arrange(medal) %>%
+  mutate(posy = 4.4 + row_number()/8) %>%
+  ungroup()
+
+# segment for event list
+pot <- events %>%
+  group_by(year) %>%
+  summarise(
+    posy_min = cosw(unique(year)),
+    posy_max = max(posy)
+  )
+
+# Medal summary
+medal_text <- zorn_medal %>%
+  group_by(posy, medal) %>%
+  summarise(nb_medal = n()) %>%
+  ungroup() %>%
+  mutate(posy = ifelse(posy == 1, 0.95, posy)) %>%
+  bind_cols(size = c(5, 6, 15)) %>%  # font size go with scale_size_continuous
+  bind_cols(offsetx = c(0.05,0.2,0))
+
+medal_sum <- zorn_medal %>%
+  group_by(medal) %>%
+  summarise(nb_medal = n()) %>%
+  ungroup() %>%
+  mutate(pack = map(nb_medal, function(x){circleProgressiveLayout(rep(0.3, x), sizetype ="radius")}),
+         circles = map(pack, circleLayoutVertices, npoints = 25),
+         posy = as.numeric(medal)) %>%
+  select(-pack) %>%
+  unnest(circles) %>%
+  mutate(circlex = 2010.5 + x + (3-posy)/5,
+         circley = posy + y/4,
+         id = glue("{medal}{id}")) %>%
+  select(circlex, circley, medal, id)
+
+# Medal for each year / medal
+medal_pool <- zorn_medal %>%
+  group_by(year, medal) %>%
+  summarise(nb_medal = n()) %>%
+  ungroup() %>%
+  mutate(pack = map(nb_medal, function(x){circleProgressiveLayout(rep(0.3, x), sizetype ="radius")}),
+         circles = map(pack, circleLayoutVertices, npoints = 25),
+         posy = as.numeric(medal)) %>%
+  select(-pack) %>%
+  unnest(circles) %>%
+  mutate(
+    circlex = ifelse(nb_medal <= 4, year + x+0.2, year +x), 
+    circley = ifelse(nb_medal %in% c(3,4), posy + y/4 + 0.05, posy + y/4),
+    id = glue("{year}{medal}{id}")) %>%
+  select(circlex, circley, medal, id)
+
+```
+
+```{r colors}
+
+bck_clr <- "#DEF5FB"
+water_clr <- "#19CEFB"
+lines_clr <- "#003196"
+tile_clr <- "#08B5E5"
+title_clr <- "#144885"
+
+```
+
+
+```{r plot}
+
+title <- "Medal history of Trischa Zorn"
+subtitle <- "Trischa Zorn is an American Paralympic swimmer and the most successful athlete in the history of the Paralympic Games"
+
+final <- ggplot() +
+  # swimming pool
+  annotate("rect", xmin = 1976, xmax = 2008, ymin = 0.5, ymax = 3.5, fill = water_clr) +
+  geom_segment(data = lines, aes(x = x, xend = xend, y = y, yend = yend), color = lines_clr, size = 10) +
+  geom_segment(data = lines, aes(x = x, xend = x, y = y-0.2, yend = y + 0.2), color = lines_clr, size = 10) +
+  geom_segment(data = lines, aes(x = xend, xend = xend, y = yend-0.2, yend = yend + 0.2), color = lines_clr, size = 10) + 
+  geom_segment(data = segment_tile_x, aes(x = x, xend = x, y = 0.5, yend = 3.5), color = tile_clr, size = 0.1) + 
+  geom_segment(data = segment_tile_y, aes(x = 1976, xend = 2008, y = y, yend = y), color = tile_clr, size = 0.1) + 
+  geom_segment(data = float_line, aes(x = x, xend = x + 0.4, y =y, yend = y), size = 2, color = "white")+
+  geom_segment(data = float_line, aes(x = x+0.5, xend = x + 0.9, y =y, yend = y), size = 2, color = "red")+
+  # Waves
+  geom_ribbon(data = waves, aes(x = x, ymin = 3.5, ymax = yback-0.1), fill = water_clr, color = water_clr, inherit.aes = FALSE, alpha = 0.5) +
+  geom_ribbon(data = waves, aes(x = x, ymin = 3.5, ymax = y), fill = water_clr, color = water_clr, inherit.aes = FALSE) +
+  # event list by game
+  geom_segment(data = pot, aes(x = year, xend = year, y = posy_min, yend = posy_max), color = "grey40") +
+  geom_point(data = games, aes(x = year, y = posy), color = "grey40")+
+  geom_text(data = events, aes(x = year-0.3, y = posy, label = event), hjust = 1, family = "roboto condensed", size = 3.5) +
+  geom_point(data = events, aes(x = year, y = posy, fill = medal, color = medal), size = 5, shape = 21) +
+  # Dates & name of the Games
+  geom_text(data = games, aes(x = year , y = posy_year, label = year), family = "oswald", color = "white", size = 4.5, fontface = "bold") +
+  geom_text(data = games, aes(x = year , y = posy_city, label = city), family = "oswald", color = "white", size = 5.5, fontface = "bold") +
+  # Medals in the swimming pool
+  geom_polygon(data = medal_pool, aes(x = circlex, y = circley, group=id, fill= medal, color = medal), size = 0.5) +
+  # Medals summary
+  geom_polygon(data = medal_sum, aes(x = circlex, y = circley, group=id, fill= medal, color = medal), size = 0.5)+
+  geom_text(data = medal_text, aes(x = 2010.5 + offsetx, y = posy, label = nb_medal, size = size, color = medal), alpha = 1, family = "oswald")+
+  # Title & subtitle
+  annotate("text", x = 2012, y = 6, label = title, hjust = 1,family = "oswald", size = 10, lineheight = 1, color = title_clr, fontface = "bold") +
+  annotate("text", x = 2012, y = 5.5, label = str_wrap(subtitle, 50), hjust = 1,family = "oswald", size = 6, lineheight = 1, color = title_clr) + 
+  # scales
+  scale_size_continuous(range = c(12,25)) +
+  scale_fill_manual(values = c("Gold" = "#FEE101", "Silver" = "#A7A7AD", "Bronze" = "#A77044")) +
+  scale_color_manual(values = c("Gold" = "#FFB20D", "Silver" = "#838389", "Bronze" = "#5E4027")) +
+  guides(fill = "none", size = "none", color = "none") +
+  labs(caption = "Visualization: Christophe Nicault | Data: Wikipedia")+
+  theme_void() +
+  theme(plot.background = element_rect(fill = bck_clr, color = NA),
+        plot.caption = element_text(family = "techmono", size = 12, hjust = 0.98, color = title_clr, margin = margin(0,0,5,0)))
+```
+
+
+```{r save}
+
+ragg::agg_png(here::here("render", paste0("paralympics_medals_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")), res = 320, width = 16, height = 10, units = "in")
+
+final
+  
+dev.off()
+
+```
+
+
+

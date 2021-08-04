@@ -1,10 +1,18 @@
 # Tidy Tuesday data visualisation
 
+## 2021 week 31 - Paralympic Medals
+
+Medal history of Trischa Zorn
+
+![The visualization shows the medal record of Trischa Zorn who is the most successful athlete in the history of the Paralympic Games. It represents a swimming pool which a lane per medal, and on the length, the 7 Games she participated. She won 37 gold medals, 10 silver, and 5 bronze.](/2021/2021-32-paralympic_medals/paralympics_medals.png)
+
+----
+
 ## 2021 week 31 - Olympic history
 
 History of National Olympic Committees participating in the Olympic Summer Games
 
-![The graph shows the history of national committees participatning in modern Olympic Games, and the impact of some events, like the world war 1 and 2, and the African boycott of the 1976 games, the boycott of the Russian games in 1980 and the increase in the number of countries due to the ex-soviet countries..](/2021/2021-31-olympic_medals/olympic_medals.png)
+![The graph shows the history of national committees participating in modern Olympic Games, and the impact of some events, like the world war 1 and 2, and the African boycott of the 1976 games, the boycott of the Russian games in 1980 and the increase in the number of countries due to the ex-soviet countries.](/2021/2021-31-olympic_medals/olympic_medals.png)
 
 ----
 
