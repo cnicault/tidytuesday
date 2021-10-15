@@ -1,6 +1,14 @@
 # Tidy Tuesday data visualisation
 
-## 2021 week 31 - Paralympic Medals
+## 2021 week 42 - Global Seafood
+
+Global seafood production and distribution amongst main producers
+
+![The visualization shows the upward evolution of the seafood production, and that 4 countries (China, India, Indonesia and Peru) fish about half the world production.](/2021/2021-42-global_seafood/global_seafood.png)
+
+----
+
+## 2021 week 32 - Paralympic Medals
 
 Medal history of Trischa Zorn
 

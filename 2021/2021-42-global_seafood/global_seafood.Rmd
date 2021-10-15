@@ -1,0 +1,210 @@
+---
+title: "Global Seafood"
+author: "Christophe Nicault"
+date: "15/10/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r load_packages}
+
+library(tidyverse)
+library(scales)
+library(tidytext)
+library(glue)
+library(patchwork)
+library(showtext)
+
+font_add_google("Roboto", "roboto")
+font_add_google("Mitr", "mitr")
+font_add_google("Khula", "khula")
+font_add_google("Share Tech Mono", "techmono")
+
+showtext_opts(dpi = 320)
+showtext_auto(enable = TRUE)
+
+```
+
+```{r load_data}
+
+production <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-10-12/seafood-and-fish-production-thousand-tonnes.csv')
+
+```
+
+Selection of the 4 countries with the largest production
+
+```{r selection}
+
+selection <- production %>%
+  filter(Code != "OWID_WRL", !is.na(Code), Year == max(Year)) %>%
+  pivot_longer(cols = -c(Entity, Code, Year)) %>%
+  group_by(Entity, Code) %>%
+  summarise(total = sum(value, na.rm = TRUE)) %>%
+  ungroup() %>%
+  slice_max(total, n = 4) %>%
+  select(Code, Entity)
+
+```
+
+Long format clean
+
+```{r clean}
+
+prod_long <- production %>%
+  filter(Code == "OWID_WRL") %>%
+  pivot_longer(cols = -c(Entity, Code, Year)) %>%
+  mutate(fish = str_split(name, " - ", simplify = TRUE)[,3],
+         fish = str_remove(fish, ". Other"))
+
+```
+
+
+```{r prod_evolution}
+
+bck_color <- "grey20"
+
+production_sum <- prod_long %>%
+  group_by(Year, fish) %>%
+  summarise(total = sum(value, na.rm = TRUE)) %>%
+  ungroup()
+
+
+lines_label <- production_sum %>%
+  filter(Year == max(Year)) %>%
+  arrange(total) %>%
+  mutate(cum = cumsum(total),
+         posy = lag(cum, default = 0) + total / 2) %>%
+  bind_cols(posyend = seq(1e7, 12e7, 12e7 / 7))
+         
+
+year_list <- tibble(year = seq(1960, 2010, 10))
+
+fish_order <- production_sum %>%
+  filter(Year == max(Year)) %>%
+  arrange(desc(total)) %>%
+  pull(fish)
+
+
+axis_p1 <- tibble(x = c(1958,1970,1980, 1990, 2000),
+                  xend = rep(2013,5),
+                  y = seq(5e7, 15e7, 2.5e7),
+                  yend = seq(5e7, 15e7, 2.5e7))
+
+
+color_fish <- c()
+color_fish[fish_order] <- colorRampPalette(c("#037380", "#8BF7FC"))(7)
+
+production_species_plt <- production_sum %>%
+  mutate(fish = fct_relevel(fish, fish_order)) %>%
+  ggplot() +
+  geom_segment(data = axis_p1, aes(x = x, xend = xend, y = y, yend = yend), color = "white", linetype = "13", size = 0.3, inherit.aes = FALSE) +
+  geom_text(data = axis_p1, aes(x = x, y = yend, label = comma(yend)), color = "white", hjust = 0, nudge_y = 2e6, size = 2.5, family = "roboto", inherit.aes = FALSE) +
+  geom_text(data = year_list, aes(x = year, y = -3.5e6, label = year), color = "white", size = 2.5, family = "roboto", inherit.aes = TRUE)+
+  geom_area(aes(Year, total, fill = fish), color = "grey60") +
+  geom_segment(data = lines_label, aes(x = 2013, xend = 2025, y = posy, yend = posyend, color = fish))+
+  geom_segment(data = lines_label, aes(x = 2030, xend = 2050, y = posyend, yend = posyend, color = fish))+
+  geom_label(data = lines_label, aes(x = 2025, y = posyend, label = fish, color = fish), fill = bck_color, size = 3, family = "khula", nudge_y = 3e6, label.size = 0, hjust = 0, fontface = "bold", inherit.aes = FALSE) +
+    geom_label(data = lines_label, aes(x = 2025, y = posyend, label = glue("{comma(total)} tonnes"), color = fish), fill = bck_color, size = 3, family = "khula", nudge_y = -2e6, label.size = 0, hjust = 0, fontface = "bold", inherit.aes = FALSE) +
+  annotate("text", x = 1960, y = 150e6, label = "Evolution by species", family = "khula", size = 5, color = "white", hjust = 0) +
+  annotate("text", x = 2040, y = 150e6, label = "Distribution among the 4 largest producers for year 2013", family = "khula", size = 5, color = "white", hjust = 0) +
+  annotate("text", x = 1960, y = 143e6, label = "(tonnes)", family = "roboto", size = 3, color = "white", hjust = 0) +
+  annotate("text", x = 2040, y = 143e6, label = "(tonnes)", family = "roboto", size = 3, color = "white", hjust = 0) +
+  scale_fill_manual(values = color_fish) +
+  scale_color_manual(values = color_fish) +
+  scale_x_continuous(limits = c(1958,2100)) +
+  guides(fill = "none", color = "none") +
+  theme_void()+
+  theme(plot.background = element_rect(fill = bck_color, color = NA))
+
+```
+
+Tricky part : use tidytext::reorder_within to reorder countries by total within each fish group, and place other at the end
+to group all countries together and show how much 4 countries account in the world production. 
+
+```{r prod_country}
+
+prod_reorder <- production %>%
+  filter(Code != "OWID_WRL", !is.na(Code), Year == max(Year)) %>%
+  pivot_longer(cols = -c(Entity, Code, Year)) %>%
+  mutate(fish = str_split(name, " - ", simplify = TRUE)[,3],
+         fish = str_remove(fish, ". Other")) %>%
+  mutate(Code = ifelse(Code %in% selection$Code, Code, "OTH"),
+         Entity = ifelse(Entity %in% selection$Entity, Entity, "Others")) %>%
+  group_by(Year, fish, Code, Entity) %>%
+  summarise(total = sum(value, na.rm = TRUE)) %>%
+  ungroup() %>% 
+  mutate(tot_order = ifelse(Code == "OTH",0, total), # move other category to the end
+         fish = fct_relevel(fish, rev(fish_order)), 
+         Entity_wt = reorder_within(Entity, tot_order, fish))  # reorder entity by total (with other = 0) within fish groups
+
+
+
+prod_colors <- tibble(Color = c("grey60", colorRampPalette(c("#7EA629", "#027373"))(4)),
+                      Code = c("OTH",selection$Code),
+                      Entity = c("Others",selection$Entity))
+
+color_within <- prod_reorder %>%
+  left_join(prod_colors)
+
+color_cty <- c()
+color_cty[color_within$Entity_wt] <- color_within$Color
+
+axis_p2 <- tibble(x = c(1, 2, 5, 6, 6, 7),
+                  xend = rep(7.7,6),
+                  y = seq(0, 5e7, 1e7),
+                  yend = seq(0, 5e7, 1e7))
+
+production_cty_plt <- prod_reorder %>%
+  ggplot(aes(as.numeric(fish), total, fill = Entity_wt)) +
+  geom_segment(data = axis_p2, aes(x = x, xend = xend, y = y, yend = yend), color = "white", linetype = "13", size = 0.3, inherit.aes = FALSE) +
+  geom_text(data = axis_p2, aes(x = xend, y = yend, label = comma(yend)), color = "white", nudge_x = 0.2, size = 2.5, family = "roboto", inherit.aes = FALSE) +
+  geom_col(color = "grey30", width = 0.6, size = 0.2) +
+  coord_flip() +
+  guides(fill = "none") +
+  scale_fill_manual(values = color_cty) +
+  theme_void()
+
+```
+
+Legend
+
+```{r legend}
+
+legend_plt <- prod_colors %>%
+  bind_cols(y = seq(5,1,-1)) %>%
+  ggplot()+
+  geom_rect(aes(xmin = 1, xmax = 2, ymin = y, ymax = y +0.8, fill = Color))+
+  geom_text(aes(x = 1.5, y = y+0.4, label = Entity), size = 3, family = "roboto", color = "white") +
+  scale_fill_identity()+
+  theme_void()
+
+```
+
+Final plot
+
+```{r final_plot}
+
+final <- production_species_plt + inset_element(production_cty_plt, 0.6,0.055,1, 0.84)+
+  inset_element(legend_plt, 0.9,0.1, 0.95, 0.4)+ plot_annotation(
+  caption = "Visualization: Christophe Nicault | Data: OurWorldinData.org",
+  title = "Global Seafood Production",
+  theme=theme(
+    plot.background = element_rect(fill = bck_color, color = NA),
+    plot.margin = margin(10,5,5,0),
+    plot.title = element_text(family = "mitr", size = 25, color = "white", hjust = 0.5, margin = margin(5,0,15,0)),
+    plot.caption = element_text(family = "techmono", size = 9, color = "white", hjust = 0.95)     
+  )
+)
+
+ragg::agg_png(here::here("render", paste0("global_seafood_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")), res = 320, width = 14, height = 7, units = "in")
+
+final
+  
+dev.off()
+
+```
+
