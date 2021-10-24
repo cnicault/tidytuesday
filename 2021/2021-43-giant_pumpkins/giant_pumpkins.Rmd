@@ -1,0 +1,168 @@
+---
+title: "Giant Pumpkins"
+author: "Christophe Nicault"
+date: "24/10/2021"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r load_packages}
+
+library(tidyverse)
+library(tidybayes)
+library(patchwork)
+library(ggtext)
+library(showtext)
+
+font_add_google("Roboto", "roboto")
+font_add_google("Roboto Condensed", "roboto condensed")
+font_add_google("Mitr", "mitr")
+font_add_google("Share Tech Mono", "techmono")
+
+showtext_opts(dpi = 320)
+showtext_auto(enable = TRUE)
+
+```
+
+```{r load_data}
+
+pumpkins <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-10-19/pumpkins.csv')
+
+```
+
+
+
+```{r clean_data}
+
+pumpkins_clean <- pumpkins %>%
+  filter(!is.na(ott), !is.na(pct_chart), !is.na(est_weight)) %>%
+  filter(!str_detect(ott, "[:alpha:]"), !str_detect(est_weight, "[:alpha:]"), !str_detect(weight_lbs, "[:alpha:]")) %>% 
+  separate(col = id, into = c("year", "type"), sep = "-", remove = TRUE) %>% 
+  mutate(ott = as.numeric(ott),
+         pct_chart = parse_number(pct_chart),
+         weight_lbs = parse_number(weight_lbs),
+         est_weight = parse_number(est_weight))  %>%
+  filter(type == "P", est_weight != 0, est_weight < 3000, abs(pct_chart) < 100) %>%
+  select(weight_lbs, est_weight, pct_chart, ott)
+
+```
+
+Real weight and estimation difference
+
+```{r estimation_realweight}
+
+axis_wl <- tibble(x = c(0, 3500, 8000, 10000, 10000, 13000),
+                  xend = 15000,
+                  y = seq(0,2500,500),
+                  yend = seq(0,2500,500))
+
+giant_pumpkins <- pumpkins_clean %>%
+  arrange(weight_lbs) %>%
+  mutate(idx = row_number()) %>%
+  ggplot()+
+  geom_segment(data = axis_wl, aes(x= x, xend = xend, y =y, yend = yend), linetype = "13", color = "white") +
+  geom_text(data = axis_wl, aes(x = xend, y = y, label = glue::glue("{y} lbs")), hjust = 1, nudge_y = 50, color = "white", family = "roboto condensed") +
+  geom_segment(aes(x = idx, xend = idx, y = weight_lbs, yend = est_weight), alpha = 1, size = 0.2, color = "grey60")+
+  geom_point(aes(x = idx, y = weight_lbs), color = "white", alpha = 0.6, size = 0.8) +
+  geom_point(aes(x = idx, y = est_weight), color = "#F28705", alpha = 0.2, size = 0.8) +
+  annotate("segment", x = 7000, xend = 10000, y = 1200, yend=1500, color = "white", linetype = "13") +
+  annotate("segment", x = 7000, xend = 10000, y = 2700, yend=2000, color = "white", linetype = "13") +
+  scale_y_continuous(limits = c(0,2700)) +
+  theme_void()+
+  theme(plot.background = element_rect(fill = "grey20", color = NA))
+
+```
+
+Zoom on 1500 - 2000 lbs
+
+```{r zoom}
+
+zoom_data <- pumpkins_clean %>%
+  filter(between(weight_lbs, 1500, 2000))%>%
+  arrange(weight_lbs) %>%
+  mutate(idx = row_number())
+
+outside <- zoom_data %>%
+ filter(between(weight_lbs, 1500, 2000))%>%
+ mutate(est_weight = ifelse(est_weight < 1500, 1500, est_weight),
+        est_weight = ifelse(est_weight > 2000, 2000, est_weight)) 
+
+zoom_plt <- zoom_data %>%
+  ggplot()+
+  geom_segment(aes(x = idx, xend = idx, y = weight_lbs, yend = est_weight), alpha = 1, size = 0.2, color = "grey60")+
+  geom_segment(data =outside, aes(x = idx, xend = idx, y = weight_lbs, yend = est_weight), alpha = 1, size = 0.2, color = "grey60", linetype = "13", inherit.aes = FALSE)+
+  geom_point(aes(x = idx, y = weight_lbs), color = "white", alpha = 1, size = 0.8) +
+  geom_point(aes(x = idx, y = est_weight), color = "#F28705", alpha = 1, size = 0.8) +
+  scale_y_continuous(limits = c(1500, 2000)) +
+  theme_void()+
+  theme(plot.background = element_rect(fill = "grey20", color = "grey60", size = 2))
+
+```
+
+Distribution of the estimation error
+
+```{r estimation_distribution}
+
+pal <- c("#F2E205", "#F2CA50", "#F28705", "#D96704", "#8C3503")
+
+label <- tibble(x = seq(250,2250,500),
+                y = rep(500, 5),
+                label = glue::glue("{seq(0,2000,500)} lbs - {seq(500,2500,500)} lbs"))
+
+
+axis_error_est <- tibble(x = rep(75,6),
+                  xend = rep(2500, 6),
+                  y = seq(-300,200, 100),
+                  yend = seq(-300,200, 100))
+
+error_est_data <- pumpkins_clean %>%
+  mutate(breaks = cut(weight_lbs, breaks = seq(0,2500,500)),
+         idx = (as.numeric(breaks)-1)*500+150,
+         diff = est_weight - weight_lbs,
+         label = glue::glue("{lag(breaks)} - {breaks}")) %>% 
+  filter(abs(diff) < 500)
+
+error_est_plt <- error_est_data %>%
+  ggplot() +
+  geom_segment(data = axis_error_est, aes(x = x, xend = xend, y = y, yend = yend), linetype = "13", color = "grey60") +
+  geom_text(data = axis_error_est, aes(x= 0, y = y, label = y), color = "white", family = "roboto condensed") +
+  stat_interval(aes(idx, diff), .width = c(.1, .25, .5, .75, 1), height = 5, show.legend = F) +
+  geom_text(data = label,aes(x = x, y = y, label = label), color = "white", hjust = 1, family = "roboto condensed") +
+  stat_halfeye(aes(idx + 50, diff), .width = 0, fill = "#F28705", size = 0.5, point_color = "white") +
+  coord_flip()+
+  scale_color_manual(values = rev(pal)) +
+  scale_x_continuous(limits = c(0,2700)) +
+  theme_void()+
+  theme(plot.background = element_rect(fill = "grey20", color = NA))
+
+```
+
+
+```{r final}
+
+final <- giant_pumpkins + inset_element(zoom_plt, 0.05, 0.45, 0.465, 0.96) + error_est_plt + 
+  plot_layout(widths = c(2, 1))+ plot_annotation(
+  caption = "Visualization: Christophe Nicault | Data: BigPumpkins.com",
+  title = "Great Pumpkins Commowealth Weighoff",
+  subtitle = "Estimation error for Giant Pumpkins.<br> Under 1500 lbs, the <span style='color:#F28705'>estimated weight</span> is normally distributed around the real weight of the pumpkins.<br>Above 1500 lbs, the estimation tend to be lower than the real value with a difference in average of 100 lbs.",
+  theme=theme(
+    plot.background = element_rect(fill = "grey20", color = NA),
+    plot.margin = margin(10,10,5,10),
+    plot.title = element_text(family = "mitr", size = 22, color = "#F28705", hjust = 0.5, margin = margin(5,0,10,0)),
+    plot.subtitle = element_markdown(family = "roboto", size = 14, color = "white", hjust = 0.5, margin = margin(5,0,15,0),lineheight = 1.2),         plot.caption = element_text(family = "techmono", size = 11, color = "white", hjust = 0.95, margin = margin(5,0,5,0))     
+  )
+)
+
+ragg::agg_png(here::here("render", paste0("giant_pumpkins_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")), res = 320, width = 16, height = 10, units = "in")
+
+final
+  
+dev.off()
+
+```
+
