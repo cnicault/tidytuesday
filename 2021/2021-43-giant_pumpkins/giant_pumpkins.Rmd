@@ -148,7 +148,7 @@ error_est_plt <- error_est_data %>%
 final <- giant_pumpkins + inset_element(zoom_plt, 0.05, 0.45, 0.465, 0.96) + error_est_plt + 
   plot_layout(widths = c(2, 1))+ plot_annotation(
   caption = "Visualization: Christophe Nicault | Data: BigPumpkins.com",
-  title = "Great Pumpkins Commowealth Weighoff",
+  title = "Great Pumpkins Commowealth Weigh-off",
   subtitle = "Estimation error for Giant Pumpkins.<br> Under 1500 lbs, the <span style='color:#F28705'>estimated weight</span> is normally distributed around the real weight of the pumpkins.<br>Above 1500 lbs, the estimation tend to be lower than the real value with a difference in average of 100 lbs.",
   theme=theme(
     plot.background = element_rect(fill = "grey20", color = NA),

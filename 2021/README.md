@@ -2,9 +2,9 @@
 
 ## 2021 week 43 - Giant Pumpkins
 
-Great Pumpkins Commowealth Weighoff
+Great Pumpkins Commowealth Weigh-off
 
-![Estimation error for Giant Pumpkins for Great Pumpkins Commowealth Weighoff. Under 1500 lbs, the is normally distributed around the real weight of the pumpkins. Above 1500 lbs, the estimation tend to be lower than the real value with a difference in average of 100 lbs.](/2021/2021-43-giant_pumpkins/giant_pumpkins.png)
+![Estimation error for Giant Pumpkins for Great Pumpkins Commowealth Weigh-off. Under 1500 lbs, the is normally distributed around the real weight of the pumpkins. Above 1500 lbs, the estimation tend to be lower than the real value with a difference in average of 100 lbs.](/2021/2021-43-giant_pumpkins/giant_pumpkins.png)
 
 ----
 
