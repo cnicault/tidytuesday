@@ -1,0 +1,181 @@
+---
+title: "Freedom in the World"
+author: "Christophe Nicault"
+date: "23/02/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r load_packages}
+library(tidyverse)
+library(patchwork)
+library(showtext)
+
+font_add_google("Roboto Condensed", "roboto condensed")
+font_add_google("Khula", "khula")
+font_add_google("lexend", "lexend")
+font_add_google("Share Tech Mono", "techmono")
+
+showtext_opts(dpi = 320)
+showtext_auto(enable = TRUE)
+```
+
+```{r load_data}
+
+freedom <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-02-22/freedom.csv')
+
+```
+
+```{r parameters}
+
+col_low <- "#FA7F08"
+col_high <- "#348888"
+col_mid <- "#9EF8EE"
+bck_clr <- "grey20"
+
+seg_size <- 0.01
+
+```
+
+```{r data_prep}
+# invert to have highest values -> best
+freedom_clean <- freedom %>%
+  mutate(CL = 8 - CL,
+         PR = 8 - PR) %>%
+  filter(year %in% c(2001,2020)) %>%
+  group_by(country) %>%
+  mutate(gap_cl = CL - lag(CL),
+         gap_pr = PR - lag(PR)) %>%
+  ungroup() %>%
+  filter(!is.na(gap_cl), !is.na(gap_pr)) 
+
+cl_top <- freedom_clean %>%
+  filter(gap_cl == max(gap_cl))
+
+cl_bottom <- freedom_clean %>%
+  filter(gap_cl == min(gap_cl))
+
+free_ros <- freedom_clean %>%
+  filter(!is.na(gap_cl)) %>%
+  count(gap_cl, gap_pr) %>%
+  mutate(sign = ifelse(sign(gap_cl) == -1 | sign(gap_pr) == -1, -1, 1),
+         prod =  sign * sqrt((gap_cl^2) + (gap_pr^2))) %>%
+  arrange(n)
+
+```
+
+
+```{r evolution}
+
+seg_cl <- tibble(x = seq(-2,2,seg_size),
+              xend = seq(-2,2,seg_size),
+              y = rep(-5.6, 4/seg_size +1),
+              yend = rep(-6, 4/seg_size +1)) %>%
+  mutate(color = x*diff(range(free_ros$prod))/diff(range(x)))
+
+seg_pr <- tibble(x = rep(4.1, 10/seg_size +1),
+              xend = rep(4.4, 10/seg_size +1),
+              y = seq(-5,5,seg_size),
+              yend = seq(-5,5,seg_size))%>%
+  mutate(color = y*diff(range(free_ros$prod))/diff(range(y)))
+
+seg <- bind_rows(seg_cl, seg_pr)
+
+signs <- tibble(x = c(4.25, 4.25, -1.7, 1.7),
+                y = c(-4.5, 4.5, -5.8, -5.8),
+                text = c("Loss", "Gain", "Loss", "Gain"),
+                angle = c(90, 90, 0, 0))
+
+rosace <- ggplot()+
+  geom_segment(data = free_ros, aes(x =0, xend = gap_cl, y = 0, yend = gap_pr, color = prod), size = 1)+
+  geom_point(data = free_ros, aes(x = gap_cl, y = gap_pr, color = prod, size = n))+
+  geom_text(data = filter(free_ros, n != 1), aes(x = gap_cl, y = gap_pr, label = n), size = 3.5, family = "oswald")+
+  geom_text(data = cl_top, aes(x = gap_cl, y = gap_pr, label = str_wrap(country, 20)), hjust = 0, nudge_x = 0.2, color = "white", family = "roboto condensed") +
+  geom_text(data = cl_bottom, aes(x = gap_cl, y = gap_pr, label = str_wrap(country, 20)), hjust = 1, nudge_x = -0.2, color = "white", family = "roboto condensed") +
+  geom_segment(data = seg, aes(x = x, xend = xend, y = y, yend = yend, color = color)) +
+  geom_text(data = signs, aes(x = x, y = y, label = text, angle = angle), family = "khula", size = 3, fontface = "bold")+
+  annotate("text", x = 0, y = -5.80, label = "Civil Liberties", family = "khula", size = 4, fontface = "bold") +
+  annotate("text", x = 4.25, y = 0, label = "Political Rights", family = "khula", size = 4, fontface = "bold", angle = 90) +
+  scale_x_continuous(breaks = seq(-4, 4.5), limits = c(-4, 4.5)) +
+  scale_y_continuous(breaks = seq(-5, 5, 1), position = "right") +
+  scale_color_gradient2(low = col_low, high = col_high, mid = "white", midpoint = 0) +
+  scale_size(range= c(2, 14)) +
+  guides(color = "none", size = "none") +
+  labs(title = "Evolution from 2001 to 2020") +
+  theme_void()+
+  theme(plot.background = element_rect(fill = bck_clr, color = bck_clr),
+        plot.title = element_text(family = "lexend", size = 15, color = "white", hjust = 0.5, margin = margin(5,0,10,0)))
+
+
+
+```
+
+```{r situation_2020}
+
+seg_cl <- tibble(x = seq(0.8,7.2,seg_size),
+              xend = seq(0.8,7.2,seg_size),
+              y = rep(-0.1, 6.4/seg_size +1),
+              yend = rep(-0.4, 6.4/seg_size +1)) %>%
+  mutate(color = x^2)
+
+seg_pr <- tibble(x = rep(0-0.1, 6.4/seg_size +1),
+              xend = rep(-0.4, 6.4/seg_size +1),
+              y = seq(0.8,7.2,seg_size),
+              yend = seq(0.8,7.2,seg_size))%>%
+  mutate(color = y^2)
+
+signs <- tibble(x = c(-0.25, -0.25, 1.25, 6.75),
+                y = c(1.25, 6.75, -0.25, -0.25),
+                text = c("-", "+", "-", "+"))
+
+seg <- bind_rows(seg_cl, seg_pr)
+
+situation_2020 <- freedom_clean %>%
+    filter(!is.na(gap_cl)) %>%
+  count(CL, PR) %>%
+  arrange(n) %>%
+  mutate(prod = CL * PR) %>%
+  ggplot() +
+  scale_color_gradient2(low = col_low, high = col_high, mid = col_mid, midpoint = 24) +
+  geom_point(aes(CL, PR, size = n, color = prod)) +
+  geom_text(aes(CL, PR,label = n), size = 4, family = "oswald", fontface = "bold") +  
+  geom_segment(data = seg, aes(x = x, xend = xend, y = y, yend = yend, color = color)) +
+  geom_text(data = signs, aes(x = x, y = y, label = text), family = "khula", size = 5, fontface = "bold")+
+  annotate("text", x = 4, y = -0.25, label = "Civil Liberties", family = "khula", size = 4, fontface = "bold") +
+  annotate("text", x = -0.25, y = 4, label = "Political Rights", family = "khula", size = 4, fontface = "bold", angle = 90) +
+  scale_size(range= c(5, 25)) +
+  guides(color = "none", size = "none") +
+  labs(title = "Situation in 2020") +
+  theme_void()+
+  theme(plot.background = element_rect(fill = bck_clr, color = bck_clr),
+        plot.title = element_text(family = "lexend", size = 15, color = "white", hjust = 0.5, margin = margin(5,0,10,0)))
+
+
+```
+
+```{r final}
+
+final <- situation_2020 + rosace + plot_annotation(
+  caption = "Visualization: Christophe Nicault | Data: Freedom House, United Nations, by way of Arthur Cheib",
+  title = "Freedom in the World",
+  subtitle = "Classification of countries measured by their civil liberties and policital rights.\n Each circle represents the number of countries in that category.\nThe 10 countries named are the countries with the most dramatic change, positively or negatively.",
+  theme=theme(
+    plot.background = element_rect(fill = bck_clr, color = bck_clr),
+    plot.margin = margin(10,5,5,0),
+    plot.title = element_text(family = "lexend", size = 25, color = "white", hjust = 0.5, margin = margin(5,0,15,0)),
+    plot.subtitle = element_text(family = "roboto condensed", color = "white", size = 12, hjust = 0.5, margin = margin(0,0,20,0)),
+    plot.caption = element_text(family = "techmono", size = 8, color = "white", hjust = 0.95, margin = margin(10,0,5,0))
+  )
+)
+
+ragg::agg_png(here::here("render", paste0("freedom_world_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")), res = 320, width = 12, height = 8, units = "in")
+
+final
+
+dev.off()
+```
+
