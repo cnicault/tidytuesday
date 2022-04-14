@@ -1,5 +1,13 @@
 # Tidy Tuesday data visualisation
 
+## 2022 week 15 - Indoor Air Pollution
+
+Evolution of the percentage of death from indoor air pollution
+
+![The graph shows the decrease of the percentage of death from indoor air pollution when the access to clean fuel for cooking increase](/2022-15-indoor_air_pollution/indoor_air_pollution.png)
+
+----
+
 ## 2022 week 8 - Freedom in the World
 
 Situation of civil liberties and political rights in 2020 and evolution between 2001 and 2020

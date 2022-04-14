@@ -1,0 +1,187 @@
+---
+title: "Indoor pollution"
+author: "Christophe Nicault"
+date: "14/04/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r load_packages}
+
+library(tidyverse)
+library(patchwork)
+library(showtext)
+
+font_add_google("Roboto", "roboto")
+font_add_google("Roboto Condensed", "roboto condensed")
+font_add_google("Oswald", "oswald")
+font_add_google("Khula", "khula")
+font_add_google("Share Tech Mono", "techmono")
+
+showtext_opts(dpi = 320)
+showtext_auto(enable = TRUE)
+
+```
+
+
+```{r load_data}
+
+tuesdata <- tidytuesdayR::tt_load(2022, week = 15)
+
+indoor_pollution <- tuesdata$indoor_pollution 
+death_ts <- tuesdata$death_timeseries
+death_full <- tuesdata$death_fuel
+fuel_gdp <- tuesdata$fuel_gdp
+
+```
+
+```{r data_cleaning}
+
+indoor_pollution <- indoor_pollution %>%
+  rename(perc_death = 4) %>%
+  mutate(continent = countrycode::countrycode(Code, "iso3c", "continent"))
+
+gap_indoor <- indoor_pollution %>%
+  filter(!is.na(Code), Code != "OWID_WRL")%>%
+  filter(Year %in% c(1990, 2019)) %>%
+  mutate(year = glue::glue("Y{Year}")) %>%
+  pivot_wider(id_cols = c("Entity", "Code"), names_from = year, values_from = perc_death) %>%
+  mutate(gap = Y2019 - Y1990) %>%
+  mutate(continent = countrycode::countrycode(Code, "iso3c", "continent"))
+
+fuel_gdp_cl <- fuel_gdp %>%
+  rename(clean_fuel = 4, gdp = 5, population = 6) %>%
+  select(-Continent) %>%
+  mutate(continent = countrycode::countrycode(Code, "iso3c", "continent")) %>%
+  filter(!is.na(continent))
+
+```
+
+
+```{r colors}
+
+pal <- c("#02403A", "#0A7373", "#757A62", "#EDAA25", "#C43302")
+
+```
+
+
+
+```{r connected_scatterplot}
+
+vgrid <- tibble(x = seq(0,100,25),
+                xend = seq(0,100,25),
+                y = rep(-0.2,5),
+                yend = c(25,25,20,15,10))
+
+hgrid <- tibble(x = rep(0,3),
+                xend = c(100,75,25),
+                y = c(0, 10, 20),
+                yend = c(0, 10, 20))
+
+graph_legend <- "The first graph shows the relation between the decrease of the percentage of death and the access to clean fuel.\nEach country is represented by a line connecting all the values from 2002 to 2019.\nIt shows that for many countries the access to clean fuel for cooking increased over\n the years resulting in a reduction of percentage of death due to indoor air pollution.\n\nThe graph below shows the evolution between 1990 and 2019\n in the distribution of the percentage of death among\n the countries of each continent."
+
+connected_scatterplot <- indoor_pollution %>%
+  select(-continent) %>%
+  left_join(fuel_gdp_cl, by = c("Entity" = "Entity", "Code" = "Code", "Year" = "Year")) %>%
+  filter(!is.na(clean_fuel), !is.na(gdp)) %>%
+  ggplot(aes(clean_fuel, perc_death, alpha = Year)) +
+  geom_line(aes(group = Code, color = continent), size = 0.9)+
+  geom_point(aes(fill = continent), size = 1, shape = 21, color = "white")+
+  annotate("text", x = 96, y = 21, label = graph_legend, family = "roboto", size = 4, hjust = 1, vjust = 1) +
+  scale_x_continuous(labels = scales::label_percent(scale = 1), expand = c(0.01,0.01))+
+  scale_y_continuous(labels = scales::label_percent(scale = 1, accuracy = 1), expand = c(0.01,0.01))+
+  scale_color_manual(values = rev(pal))+
+  scale_fill_manual(values = rev(pal))+
+  guides(alpha= "none", color = "none", fill = "none") +
+  theme_light(base_family = "roboto condensed") +
+  labs(x = "% of access to clean fuel",
+       y = "% of death")+
+  theme(axis.title.y = element_text(margin = margin(-20, -80,0,0), angle = 0, size = 12),
+        axis.title.x = element_text(margin = margin(t = 10), size = 12),
+        axis.text = element_text(size = 11),
+        panel.border = element_blank())
+
+```
+
+```{r histogram}
+
+histo_evolution <- gap_indoor %>%
+  mutate(c1990 = cut(Y1990, breaks = c(0,1,2,5,10,15,20,25)),
+         c2019 = cut(Y2019, breaks = c(0,1,2,5,10,15,20,25))) %>%
+  mutate(bornes1990 = str_match(c1990, "^\\(([0-9]+),([0-9]+)]$"),
+         bornes2019 = str_match(c2019, "^\\(([0-9]+),([0-9]+)]$")) %>%
+  mutate(c1990 = glue::glue("{bornes1990[,2]}% to {bornes1990[,3]}%"),
+         c2019 = glue::glue("{bornes2019[,2]}% to {bornes2019[,3]}%")) %>% 
+  mutate(c1990 = fct_reorder(c1990, parse_number(bornes1990[,2])),
+         c2019 = fct_reorder(c2019, parse_number(bornes2019[,2]))) %>%
+  mutate(c2019 = fct_rev(c2019),
+         c1990 = fct_rev(c1990)) %>%
+  ggplot()+
+  geom_histogram(aes(x = c1990), stat = "count", alpha = 0)+
+  annotate("rect", xmin = 4.5 ,xmax = 7.6, ymin = 0, ymax = 36, fill = "#e1e1e1", alpha = 0.5) +
+  annotate("text", x = 5, y = 25, label = "0% to 5%", color = "grey60", family = "Oswald", size = 5, fontface = "bold") +
+  geom_histogram(aes(x = c1990, fill = continent), stat = "count", alpha = 0.3)+
+  geom_histogram(aes(x = c2019, fill = continent), stat = "count", width = 0.5)+
+  scale_fill_manual(values = rev(pal)) +
+  coord_flip() +
+  facet_wrap(~continent, ncol = 5)+
+  guides(fill = "none")+
+  labs(caption = "Number of country for each range of percentage of death from indoor air pollution.\nThe light bars represent the distribution in 1990 and the dark and narrow bars represent the distribution in 2019.\nThe bin from 0% to 5% is splitted in 3 differents bins (0% to 1%, 1% to 2% and 2% to 3%) to give more detail for the countries\n which reached a low level of death, while the other bins represent 5% range.")+
+  theme_void()+
+  theme(axis.text.x = element_text(margin = margin(5,0,0,0), family = "roboto condensed", color = "grey30", size = 12),
+        axis.text.y = element_text(family = "roboto condensed", color = "grey30", size = 12),
+        panel.grid.major.x = element_line(color = "grey60", linetype = "13"),
+        panel.spacing.x = unit(8, "mm"),
+        strip.text = element_blank(),
+        plot.caption = element_text(family = "roboto", size = 12, color = "black", hjust = 0, margin = margin(t = 25, l = 40), lineheight = 1.1)
+        )
+
+```
+
+
+```{r legend}
+
+legend_df <-tibble(pos = c(0, 2, 4, 6, 8),
+             country = sort(unique(fuel_gdp_cl$continent)))
+
+legend <- legend_df %>%
+  ggplot() +
+  geom_rect(aes(xmin = pos, xmax = pos+1, ymin =0.35, ymax = 0.75, fill = country), size = 6) +
+  geom_text(aes(x = pos+0.5, y = 0.45, label = country), family = "oswald", color = "white", size = 6, hjust = 0.5, vjust = 0, fontface = "bold") +
+  scale_fill_manual(values = rev(pal)) +
+  scale_color_manual(values = rev(pal)) +
+  scale_y_continuous(limits = c(0,1)) +
+  scale_x_continuous(limits = c(0,9)) +
+  guides(color = "none", fill = "none") +
+   theme_void()
+
+```
+
+
+```{r render}
+
+final <- connected_scatterplot / legend / histo_evolution +
+  plot_layout(heights = c(3, 0.5, 1)) +
+  plot_annotation(
+  caption = "Visualization: Christophe Nicault | Data: Our world in Data",
+  title = "Evolution of death from indoor air pollution",
+  subtitle = str_wrap("The percentage of death from indoor air pollution decreased in many countries in the last 30 years, due to a better access to clean fuel for cooking. However there are inequalities with many countries still lacking access, particularly in Africa, Oceania and Asia.", 100),
+  theme=theme(
+    plot.margin = margin(10,10,5,10),
+    plot.title = element_text(family = "khula", size = 22, color = "#02403A", face = "bold", hjust = 0.5, margin = margin(5,0,10,0)),
+    plot.subtitle = element_text(family = "khula", size = 14, color = "black", hjust = 0.5, margin = margin(10,0,20,0)),
+    plot.caption = element_text(family = "techmono", size = 11, color = "#02403A", hjust = 0.95, margin = margin(20,0,5,0))     
+  )
+)
+
+ragg::agg_png(here::here("render", paste0("indoor_pollution_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")), res = 320, width = 12, height = 13, units = "in")
+
+final
+
+dev.off()
+
+```
