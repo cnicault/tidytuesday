@@ -82,7 +82,7 @@ hgrid <- tibble(x = rep(0,3),
                 y = c(0, 10, 20),
                 yend = c(0, 10, 20))
 
-graph_legend <- "The first graph shows the relation between the decrease of the percentage of death and the access to clean fuel.\nEach country is represented by a line connecting all the values from 2002 to 2019.\nIt shows that for many countries the access to clean fuel for cooking increased over\n the years resulting in a reduction of percentage of death due to indoor air pollution.\n\nThe graph below shows the evolution between 1990 and 2019\n in the distribution of the percentage of death among\n the countries of each continent."
+graph_legend <- "The first graph shows the relation between the decrease of the percentage of deaths and the access to clean fuel.\nEach country is represented by a line connecting all the values from 2002 to 2019.\nIt shows that for many countries the access to clean fuel for cooking increased over\n the years resulting in a reduction of percentage of death due to indoor air pollution.\n\nThe graph below shows the evolution between 1990 and 2019\n in the distribution of the percentage of death among\n the countries of each continent."
 
 connected_scatterplot <- indoor_pollution %>%
   select(-continent) %>%
@@ -99,7 +99,7 @@ connected_scatterplot <- indoor_pollution %>%
   guides(alpha= "none", color = "none", fill = "none") +
   theme_light(base_family = "roboto condensed") +
   labs(x = "% of access to clean fuel",
-       y = "% of death")+
+       y = "% of deaths")+
   theme(axis.title.y = element_text(margin = margin(-20, -80,0,0), angle = 0, size = 12),
         axis.title.x = element_text(margin = margin(t = 10), size = 12),
         axis.text = element_text(size = 11),
