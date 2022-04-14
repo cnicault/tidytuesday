@@ -4,7 +4,7 @@
 
 Evolution of the percentage of death from indoor air pollution
 
-![The graph shows the decrease of the percentage of death from indoor air pollution when the access to clean fuel for cooking increase](/2022-15-indoor_air_pollution/indoor_air_pollution.png)
+![The graph shows the decrease of the percentage of death from indoor air pollution when the access to clean fuel for cooking increase](/2022/2022-15-indoor_air_pollution/indoor_air_pollution.png)
 
 ----
 ## 2022 week 8 - Freedom in the World
