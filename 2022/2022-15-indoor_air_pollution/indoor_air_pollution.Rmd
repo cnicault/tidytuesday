@@ -168,7 +168,7 @@ final <- connected_scatterplot / legend / histo_evolution +
   plot_layout(heights = c(3, 0.5, 1)) +
   plot_annotation(
   caption = "Visualization: Christophe Nicault | Data: Our world in Data",
-  title = "Evolution of death from indoor air pollution",
+  title = "Evolution of deaths from indoor air pollution",
   subtitle = str_wrap("The percentage of death from indoor air pollution decreased in many countries in the last 30 years, due to a better access to clean fuel for cooking. However there are inequalities with many countries still lacking access, particularly in Africa, Oceania and Asia.", 100),
   theme=theme(
     plot.margin = margin(10,10,5,10),
