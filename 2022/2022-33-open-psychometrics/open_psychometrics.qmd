@@ -1,0 +1,212 @@
+---
+title: "Open Psychometrics"
+author: "Christophe Nicault"
+date: "18/08/2022"
+format: html
+---
+
+```{r}
+#| label: load-packages
+#| echo: false
+#| warning: false
+library(tidyverse)
+library(geomtextpath)
+library(here)
+library(ggbump)
+library(ggimage)
+library(ggforce)
+library(magick)
+library(showtext)
+library(ggtext)
+```
+
+```{r}
+#| label: load-fonts
+#| echo: false
+#| warning: false
+font_add_google("Roboto", "roboto")
+font_add_google("Roboto Condensed", "roboto condensed")
+font_add_google("Mitr", "mitr")
+font_add_google("Share Tech Mono", "techmono")
+
+showtext_opts(dpi = 320)
+showtext_auto(enable = TRUE)
+```
+
+```{r}
+#| label: load-data
+#| echo: false
+#| warning: false
+tuesdata <- tidytuesdayR::tt_load(2022, week = 33)
+
+characters <- tuesdata$characters
+psych_stats <- tuesdata$psych_stats
+myers_briggs <- tuesdata$myers_briggs
+```
+
+
+```{r}
+#| label: data-prep
+#| echo: false
+#| warning: false
+
+# select and position characters
+char_position <- tibble(char_id = c("BB1", "BB7", "BB2", "BB9", "BB3", "BB10", "BB4", "BB8"),
+                        c_x = c(rep(-6,4), rep(6,4)),
+                        c_y = c(seq(2,14,4), seq(2,14,4)))
+
+# Myers Briggs scale and position
+mb_df <- myers_briggs %>%
+  filter(str_detect(uni_name, "Breaking")) %>%
+  mutate(group = paste(char_id, myers_briggs, sep="-")) %>%
+  mutate(myers_briggs = as.factor(myers_briggs)) %>%
+  mutate(m_x = 0,
+         m_y = as.numeric(myers_briggs))
+
+mb_pos <- mb_df %>%
+  distinct(myers_briggs, m_x, m_y)
+
+# Characters traits
+char_df <- mb_df %>%
+  group_by(char_name) %>%
+  slice_max(avg_match_perc, n = 3) %>%
+  select(char_id, char_name, myers_briggs, avg_match_perc, group, m_x, m_y) %>%
+  group_by(char_id) %>%
+  mutate(rank = rank(-avg_match_perc)) %>%
+  ungroup() %>%
+  left_join(char_position, by = c("char_id" = "char_id")) %>%
+  drop_na() %>%
+  mutate(m_x = ifelse(c_x < 0, m_x - 0.5, m_x + 0.5),
+          s_x = ifelse(c_x < 0, c_x + 1, c_x - 1)) %>%
+  mutate(display_name = str_replace(char_name, " ", "\n"),
+         first_name = str_match(char_name, "([^\\s]+)")[,1],
+         last_name = str_trim(str_replace(char_name, first_name, ""))) %>%
+  left_join(select(characters, id, image_link), by = c("char_id" = "id"))
+
+
+
+```
+
+The positioning of the text on the x axis uses an ellipse equation instead of a circle to account for the aspect ratio.
+Using 2*a to shift from the original picture radius + outline circle radius, divided by b for aspect ratio.
+
+```{r}
+#| label: data-prep
+#| echo: false
+#| warning: false
+
+a <- 0.9
+b <- 1.45
+
+bbc <- psych_stats %>%
+  filter(str_detect(uni_name, "Breaking"), number_ratings > 100) %>%
+  group_by(char_name) %>%
+  arrange(desc(avg_rating)) %>%
+  slice_head(n = 6) %>%
+  mutate(rank = row_number()) %>%
+  ungroup() %>%
+  select(char_id, char_name, question, personality, avg_rating, rank)%>%
+  mutate(personality = str_replace(personality, "open to new experinces", "new experiences"),
+         personality = str_to_title(str_replace(personality, "-", " ")),
+         personality = str_replace(personality, "Iq", "IQ")) %>%
+  left_join(char_position, by = c("char_id" = "char_id")) %>%
+  drop_na() %>%
+  mutate(p_hjust = ifelse(c_x < 0, 1, 0),
+         p_y = c_y + 2 - rank * 0.55,
+         p_x = ifelse(c_x < 0, c_x - sqrt(1^2 -((rank * 0.5 - 2*a)/b)^2) - 0.4, c_x + sqrt(1^2 - ((rank * 0.5 - 2*a)/b)^2) + 0.4)
+         )
+
+mb_pos<- mb_pos %>%
+  mutate(present = ifelse(myers_briggs %in% char_df$myers_briggs, 1, 0))
+```
+
+Transform the picture with a circle shape from Jake Kaupp, see [his github](https://github.com/jkaupp/tidytuesdays/blob/master/2020/week50/R/analysis.R)
+
+
+```{r}
+#| label: image-manipulation
+#| echo: false
+#| warning: false
+#| 
+image_df <- char_df %>%
+  distinct(char_id, c_x, c_y, s_x, image_link)
+
+
+png(tf <- here("2022", "2022-33-open-psychometrics", "images", "mask.png"), 250, 250)
+par(mar = rep(0,4), yaxs="i", xaxs="i")
+plot(0, type = "n", ylim = c(0,1), xlim=c(0,1), axes=F, xlab=NA, ylab=NA)
+rect(xleft = 0, xright = 1, ybottom = 0, ytop = 1)
+plotrix::draw.circle(.5,0.5,.4, col="black")
+dev.off()
+
+mask <- here("2022", "2022-33-open-psychometrics","images", "mask.png") %>% 
+  image_read() %>% 
+  image_scale("250")
+
+
+image_df %>% 
+  mutate(img_m = map(image_link, image_read) %>% 
+           map(~image_scale(.x, "220")), 
+         circle = map(img_m, ~image_composite(mask, .x, "plus", gravity = "Center") %>% 
+                        image_trim())) %>%
+  select(char_id, circle) %>% 
+  mutate(circle  = map(circle, \(x) image_fill(image = x, color = "transparent", refcolor = "white", fuzz = 4,point = "+1+1"))) %>%
+  pwalk(~image_write(image = .y, path = here("2022", "2022-33-open-psychometrics", "images", glue::glue("{.x}.png"))))
+
+image_df_loc <- image_df %>%
+  mutate(img = map_chr(char_id, \(x) here("2022", "2022-33-open-psychometrics", "images", glue::glue("{x}.png"))))
+```
+
+
+```{r}
+#| label: rectangle
+#| echo: false
+#| warning: false
+rect_traits <- image_df_loc %>%
+  select(c_x, c_y) %>%
+  mutate(xmin = c_x,
+         xmax = c_x + 3.5 * sign(c_x),
+         ymin = c_y - 1.7,
+         ymax = c_y + 1.7)
+```
+
+
+
+```{r}
+#| label: final-plot
+#| echo: false
+#| warning: false
+
+final <- ggplot() +
+  geom_text(data = filter(mb_pos, present == 0), aes(x = m_x, y = m_y, label = myers_briggs),family = "roboto", color = "grey50", fontface = "bold") +
+  geom_text(data = filter(mb_pos, present == 1), aes(x = m_x, y = m_y, label = myers_briggs),family = "roboto", color = "white", fontface = "bold", size = 5) +
+  geom_sigmoid(data = char_df, aes(x =s_x, xend=m_x, y = c_y, yend = m_y, group = factor(group), color = as.factor(rank), size = 3-rank)) +
+  annotate("rect", xmin = -6, ymin = 12.3, xmax = -9.5, ymax = 15.7, fill = "grey30")+
+  geom_rect(data = rect_traits, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), fill = "grey30")+
+  geom_image(data = image_df_loc, aes(x = c_x, y = c_y, image = img), size = 0.12, asp = 1.6)+
+  geom_ellipse(data = image_df, aes(x0 = c_x, y0 = c_y, a = a, b = b, angle = 0), size = 6, color = "grey40") +
+  geom_textcurve(data = char_df, aes(x = c_x-a, xend = c_x + a, y = c_y + 0.68, yend = c_y + 0.68, label = first_name), family = "roboto condensed", curvature = -0.58, linecolor = NA, hjust = 0.5, color = "white", fontface = "bold")+
+  geom_textcurve(data = char_df, aes(x = c_x-a, xend = c_x + a, y = c_y - 0.68, yend = c_y - 0.68, label = last_name), family = "roboto condensed", curvature = 0.58, linecolor = NA, hjust = 0.5, color = "white", fontface = "bold") +
+  geom_text(data = bbc, aes(x = p_x, y = p_y, label = personality, hjust = p_hjust), family = "roboto", color = "grey90") +
+  annotate("text", x = 0, y = -1, label = "(E) Extraversion / (I) Introversion   -   (S) Sensing / (N) Intuition   -   (T) Thinking / (F) Feeling   -   (J) Judgement / (P) Perception", hjust = 0.5, color = "white", family = "roboto", size = 4.5) +
+  scale_x_continuous(limits = c(-9.5,9.5)) +
+  scale_color_manual(values = c("1" = "#FFB20D", "2" = "#909096", "3" = "#AB7346"))+
+  scale_size_continuous(range = c(0.5,1.5))+
+  guides(color = "none", size = "none")+
+  labs(title = "Personality traits of the main characters in Breaking Bad",
+       subtitle = "Top 3 Myers Briggs Type Indicator match for each character (<span style='color:#FFB20D;'>first</span>, <span style='color:#909096;'>second</span>, <span style='color:#AB7346;'>third</span>).<br>Top 6 personality traits (with more than 100 ratings) for each character.",
+       caption = "Visualization: Christophe Nicault | Data: Open-Source Psychometrics Project, courtesy of Tanya Shapiro")+
+  theme_void() +
+  theme(plot.background = element_rect(fill = "grey20"),
+        plot.title = element_text(family = "mitr", color = "white", size = 20, hjust = 0.5, margin = margin(10,0,5,0)),
+        plot.subtitle = element_markdown(family = "roboto", color = "white", size = 14, lineheight = 1.5, hjust = 0.5, margin = margin(10,0,5,0)),
+        plot.caption = element_text(family = "techmono", size = 10, color = "white", hjust = 0.95, margin = margin(10,0,5,0)))
+
+ragg::agg_png(here::here("render", paste0("open_psychometrics_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")), res = 320, width = 13, height = 9, units = "in")
+
+final
+
+dev.off()
+```
+
+

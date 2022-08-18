@@ -1,5 +1,12 @@
 # Tidy Tuesday data visualisation
 
+## 2022 week 33 - Open source Psychometrics project
+
+Personality traits of the main characters in Breaking Bad
+
+![The visualization shows the top 3 Myers Briggs Type Indicator match for each character, and their top 6 personality traits.](/2022/2022-33-open-psychometrics/open_psychometrics.png)
+
+----
 ## 2022 week 15 - Indoor Air Pollution
 
 Evolution of the percentage of death from indoor air pollution
