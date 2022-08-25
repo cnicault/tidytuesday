@@ -1,0 +1,175 @@
+---
+title: "Chips"
+author: "Christophe Nicault"
+date: "25/08/2022"
+format: html
+---
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(glue)
+library(patchwork)
+library(scales)
+library(showtext)
+```
+
+
+```{r}
+#| label: load-fonts
+#| echo: false
+#| warning: false
+font_add_google("Roboto", "roboto")
+font_add_google("Roboto Condensed", "roboto condensed")
+font_add_google("Mitr", "mitr")
+font_add_google("Khula", "khula")
+font_add_google("Quicksand", "quicksand")
+font_add_google("Share Tech Mono", "techmono")
+
+showtext_opts(dpi = 320)
+showtext_auto(enable = TRUE)
+```
+
+Download the data [here](https://chip-dataset.vercel.app/)
+
+```{r}
+#| label: load-data
+#| echo: false
+#| warning: false
+chips <- read_csv(here::here("2022", "2022-34-the-chip-dataset", "chip_dataset.csv"))
+```
+
+```{r}
+#| label: clean
+#| echo: false
+#| warning: false
+
+chips <- chips |> 
+  janitor::clean_names()
+
+chips <- chips  |> 
+  mutate(release_date = ymd(release_date),
+         year = year(release_date))
+```
+
+
+
+```{r}
+#| label: colors-selection
+#| echo: false
+#| warning: false
+
+# bck_clr <- "#FAF5EB"
+# pal <- c("CPU" = "#D91A4D", "GPU" = "#1790BF")
+# bck_clr <- "#FAF5EB"
+# pal <- c("CPU" = "#7F63A6", "GPU" = "#F28241")
+# bck_clr <- "#FAFAF0"
+bck_clr <- "#FFFFFF"
+pal <- c("CPU" = "#7F63A6", "GPU" = "#F25C29")
+```
+
+```{r}
+#| label: data-preparation
+#| echo: false
+#| warning: false
+
+pos_size <- chips |> 
+  filter(process_size_nm!=0) |> 
+  group_by(process_size_nm) |> 
+  summarise(min_date = min(release_date, na.rm = TRUE),
+            max_date = max(release_date, na.rm = TRUE)) %>%
+  ungroup() |> 
+  drop_na() |> 
+  arrange(min_date) |> 
+  mutate(pos_y = rep(seq(1,11,1), n(),length.out = n()))
+
+axis_df <- tibble(x = c(ymd("1999-01-01"), ymd("1999-01-01"), ymd("2004-01-01"), ymd("2010-01-01")),
+                  xend = rep(ymd("2022-12-31"), 4),
+                  y = c(10, 100, 1000, 10000),
+                  yend = c(10, 100, 1000, 10000))
+```
+
+```{r}
+#| label: transistors-plot
+#| echo: false
+#| warning: false
+
+transistors_plt <- chips |> 
+  ggplot(aes(release_date, transistors_million)) +
+  geom_segment(data = axis_df, aes(x = x, xend = xend, y = y, yend = yend), linetype = "13", inherit.aes = FALSE, size = 0.3)+
+  geom_text(data = axis_df, aes(x = xend, y = y, label = glue::glue("{comma(y)} M")), vjust = -0.3, hjust = 1, inherit.aes = FALSE, family = "roboto condensed", size = 3.5)+
+  geom_jitter(aes(fill = type), size = 2, alpha = 0.5, width = 10, height = 0.05, color = "white", shape = 21) +
+  scale_y_log10(position = "right")+
+  scale_x_date(limits = c(ymd("1999-01-01"), ymd("2022-12-31")), breaks = seq(ymd("2000-01-01"), ymd("2022-01-01"), "2 years"), labels = year(seq(ymd("2000-01-01"), ymd("2022-01-01"), "2 years")))+
+  scale_fill_manual(values = pal) +
+  guides(fill = guide_legend(label.position = "top",
+                           title.hjust = 0.5,
+                           keywidth = unit(3, "line"),
+                           keyheight = unit(1, "line"),
+                           nrow = 1,
+                           override.aes = list(alpha = 1, fill = pal, size = 10)
+                           )
+       )+
+  labs(y = "# of transistors\n(Million)")+
+  theme_void() +
+  theme(plot.background = element_rect(fill = bck_clr, color = NA),
+        axis.text.x = element_text(family = "roboto condensed", size = 12),
+        axis.title.y = element_text(margin = margin(0, 0, 0,-100), angle = 0, vjust = 1, family = "roboto condensed", size = 10),
+        legend.position = c(0.2, 0.8),
+        legend.title = element_blank(),
+        legend.text = element_text(family = "roboto", size = 12, face = "bold"))
+```
+
+
+```{r}
+#| label: process-size-plot
+#| echo: false
+#| warning: false
+
+process_size_plt <- chips |> 
+  mutate(type_vendor = paste(type, vendor)) |> 
+  left_join(pos_size) |> 
+  ggplot() +
+  geom_rect(data = pos_size, aes(xmin = min_date, xmax = max_date, ymin = pos_y, ymax = pos_y+0.8), fill = "grey90", inherit.aes = FALSE) +
+  geom_segment(aes(x = release_date, y = pos_y, xend = release_date, yend = pos_y+0.8, color = type), size = 0.3) +
+
+  geom_text(aes(min_date, pos_y, label=glue("{process_size_nm} nm")), hjust = 0.98, nudge_x = -90, nudge_y = 0.4, vjust = 0.5, size = 3.5, family = "roboto condensed")+
+  scale_x_date(limits = c(ymd("1999-01-01"), ymd("2022-12-31")))+
+  scale_color_manual(values = pal) +
+  guides(color = "none") +
+  theme_void() +
+  theme(plot.background = element_rect(fill = bck_clr, color = NA),
+        plot.margin = margin(10,0,0,0))
+```
+
+
+
+```{r}
+#| label: final-plot
+#| echo: false
+#| warning: false
+
+final <- transistors_plt / process_size_plt +  plot_layout(heights = c(3, 1.2))  +
+  plot_annotation(
+  caption = "Visualization: Christophe Nicault | Data: The CHIP Dataset",
+  title = "Evolution of chip characteristics",
+  subtitle = str_wrap("The top graph shows the evolution of the number of transistors (in million, log scale) in chips from 2020 to 2021.\nThe bottom graph shows the process size (in nm) of those chips during the period they were manufactured.", 120),
+  theme=theme(
+    plot.background = element_rect(fill = bck_clr),
+    plot.margin = margin(10,10,5,10),
+    plot.title = element_text(family = "quicksand", size = 22, color = "#02403A", face = "bold", hjust = 0.5, margin = margin(5,0,10,0)),
+    plot.subtitle = element_text(family = "khula", size = 14, color = "black", hjust = 0.5, margin = margin(10,0,20,0)),
+    plot.caption = element_text(family = "techmono", size = 11, color = "#02403A", hjust = 0.95, margin = margin(20,0,5,0))     
+  )
+)
+
+
+ragg::agg_png(here::here("render", paste0("chips_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")), res = 320, width = 12, height = 10, units = "in")
+
+final
+
+dev.off()
+```
+
+
+
