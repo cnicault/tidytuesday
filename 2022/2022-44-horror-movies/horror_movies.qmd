@@ -122,7 +122,7 @@ final <- yearly + inset_element(monthly, -0.3,0,0.9,1.2, align_to = "full") +
   plot_annotation(
   caption = "Visualization: Christophe Nicault | Data: The Movie Database",
   title = "Horror Movies",
-  subtitle = str_wrap("Evolution of the number of movies by release date and budget range, and monthly distribution.", 120),
+  subtitle = str_wrap("Evolution of the number of movies by release year and budget range, and monthly distribution.", 120),
   theme=theme(
     plot.background = element_rect(fill = "black", color = NA),
     plot.margin = margin(10,15,5,10),
