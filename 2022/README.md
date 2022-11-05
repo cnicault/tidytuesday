@@ -1,5 +1,13 @@
 # Tidy Tuesday data visualisation
 
+## 2022 week 44 - Horror Movies
+
+Number of horror movies released over the years, broken down by budget range, and monthly distribution
+
+![One graph shows the number of movies per year by budget range, showing that the increase is mainly due to low-budget movies. The second graph shows the monthly distribution with a clear peak in October and a high number of releases in January.](/2022/2022-44-horror-movies/horror_movies.png)
+
+----
+
 ## 2022 week 34 - The CHIP dataset
 
 Evolution of chip characteristics

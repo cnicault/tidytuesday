@@ -1,0 +1,141 @@
+---
+title: "Horror Movies"
+author: "Christophe Nicault"
+date: "05/11/2022"
+format: html
+---
+
+```{r}
+#| label: load-packages
+#| echo: false
+#| warning: false
+
+library(tidyverse)
+library(lubridate)
+library(ggstream)
+library(showtext)
+library(patchwork)
+
+font_add_google("Creepster", "creepster")
+font_add_google("Nosifer", "nosifer")
+font_add_google("Share Tech Mono", "techmono")
+
+showtext_opts(dpi = 320)
+showtext_auto(enable = TRUE)
+```
+
+
+```{r}
+#| label: load-data
+#| echo: false
+#| warning: false
+
+horror_movies <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-11-01/horror_movies.csv')
+
+horror_movies <- horror_movies |> 
+  mutate(year = year(release_date))
+```
+
+
+```{r}
+#| label: monthly-distribution
+#| echo: false
+#| warning: false
+
+calendar <- horror_movies |> 
+  mutate(month = month(release_date)) |> 
+  group_by(year, month) |> 
+  summarise(monthly_total = n()) |> 
+  ungroup()
+
+month13 <- calendar |> 
+  filter(month == 1) |> 
+  mutate(year = year - 1,
+         month = 13)
+
+dates_axis <- tibble(x = seq(1,12,1),
+                     y = c(250, rep(220,7), 250, 405, 250, 220),
+                     mth = lubridate::month(seq(1,12,1), abbr=TRUE, label = TRUE))
+
+monthly <- calendar |>   
+  bind_rows(month13) |>
+  bind_rows(month13) |>  # https://stackoverflow.com/questions/66821598/why-is-ggplot-geom-ribbon-area-failing-with-facets-coord-polar-with-specific
+  arrange(desc(year)) |> 
+  ggplot(aes(month, monthly_total, group = year, fill = year, alpha = 2020-year), color = "black")+
+  geom_area(position="identity",alpha = 0.1)+
+  geom_line(aes(color = year), size = 0.1)+
+  geom_text(data=dates_axis, aes(x = x, y = y, label = mth), color ="#D97904", inherit.aes = FALSE, family = "creepster", size = 4)+
+  coord_polar(start = pi) +
+  scale_fill_gradient(low = "#F2B705", high = "#D92B04")+
+  scale_color_gradient(low = "#F2B705", high = "#D92B04")+
+  scale_y_continuous(limits = c(0,410), expand = expansion(mult = c(0.3, 0))) +
+  scale_x_continuous(breaks = seq(1,12,1), limits = c(1,13), labels = lubridate::month(seq(1,12,1), abbr=TRUE, label = TRUE))+
+  theme_void()+
+  guides(color = "none", fill = "none", alpha = "none")+
+  theme(axis.text.x.top = element_blank())
+
+```
+
+
+```{r}
+#| label: yearly-evolution
+#| echo: false
+#| warning: false
+
+pal <- c("#FFDB99","#F2C879", "#F2B705", "#F29F05", "#F25C05", "#D92B04")
+
+decades <- tibble(decade = seq(1955, 2015, 10),
+                  label = glue::glue("{str_sub(seq(1960,2020,10), 3,4)}'s"))
+
+decades_bckgrd <- tibble(x = seq(1950,2021,0.05)) |> 
+  mutate(tralp = abs(sin(x*pi/10))*0.5)
+
+yearly <- horror_movies |> 
+  filter(budget>0, year != 2022) |> 
+  mutate(budget_d = cut(budget, c(0, 1e3, 1e4, 1e5, 1e6, 1e7, 1e9)), 
+         budget_d = fct_rev(budget_d),
+         budget_d = fct_recode(budget_d, "< $1K" = "(0,1e+03]","$1K - $10K" = "(1e+03,1e+04]", "$10K - $100K"= "(1e+04,1e+05]", "$100K - $1M"= "(1e+05,1e+06]", "$1M - $10M" = "(1e+06,1e+07]", "> $10M" = "(1e+07,1e+09]")) |> 
+  count(year, budget_d, sort = TRUE) |> 
+  arrange(desc(budget_d)) |> 
+  ggplot(aes(year, n, fill = budget_d, label = budget_d))+
+  geom_stream(sorting = "onset", type = "ridge")+
+  geom_stream_label(family = "creepster", size = 5, color = "black", type = "ridge", sorting = "onset") +
+  geom_segment(data = decades_bckgrd, aes(x =x, xend =x, y = -15, yend = -35, alpha = tralp), inherit.aes = FALSE, color = "#DB140B")+
+  geom_text(data=decades, aes(x = decade, y = -25, label = label), color ="black", inherit.aes = FALSE, family = "creepster", size = 5)+
+  scale_fill_manual(values = pal)+
+  scale_alpha_identity()+
+  scale_y_continuous(breaks = scales::breaks_width(100), position = "right") +
+  guides(fill = "none", alpha = "none") +
+  theme_void()+
+  theme(plot.background = element_rect(fill = "black", color = NA),
+        axis.text.y.right = element_text(color ="#D97904", family = "creepster", size = 10, margin=margin(0,0,0,-20)))
+
+```
+
+
+```{r}
+#| label: final-plot
+#| echo: false
+#| warning: false
+
+final <- yearly + inset_element(monthly, -0.3,0,0.9,1.2, align_to = "full") +
+  plot_annotation(
+  caption = "Visualization: Christophe Nicault | Data: The Movie Database",
+  title = "Horror Movies",
+  subtitle = str_wrap("Evolution of the number of movies by release date and budget range, and monthly distribution.", 120),
+  theme=theme(
+    plot.background = element_rect(fill = "black", color = NA),
+    plot.margin = margin(10,15,5,10),
+    plot.title = element_text(family = "nosifer", size = 24, color = "#D90404", face = "bold", hjust = 0.5, margin = margin(5,0,5,0)),
+    plot.subtitle = element_text(family = "creepster", size = 14, color = "#D90404", hjust = 0.5, margin = margin(5,0,10,0)),
+    plot.caption = element_text(family = "techmono", size = 7, color = "#D97904", hjust = 0.95, margin = margin(10,0,5,0))     
+  )
+)
+
+ragg::agg_png(here::here("render", paste0("horror_movies_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png")), res = 320, width = 10, height = 6, units = "in")
+
+final
+
+dev.off()
+```
+
